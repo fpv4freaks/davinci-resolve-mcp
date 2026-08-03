@@ -1,0 +1,13 @@
+{
+  "installed": [
+    {
+      "id": "safe-push",
+      "category": "skill",
+      "source": "mcaps-microsoft/ISDAIFirstAiBS",
+      "branch": "main",
+      "targetPath": ".github/skills/safe-push",
+      "sha": "35df3af2ebfc99ccfa7e4d9cab7a22b0fbfa9250"
+    }
+  ],
+  "updatedAt": "2026-08-03T16:33:19.443Z"
+}
