@@ -934,6 +934,48 @@ API_TRUTH: List[Dict[str, Any]] = [
         "tags": ["gallery", "stills", "headless", "unreliable-return"],
         "submit": "bug",
     },
+    {
+        "symbol": "MediaPoolItem.SetClipProperty('Input Color Space') — no DJI D-Log M",
+        "object": "MediaPoolItem",
+        "signature": "(key, value) -> bool",
+        "reality": "Resolve 21.0.3 ships exactly one DJI input colour space, "
+                   "'DJI D-Gamut/D-Log'. 'DJI D-Gamut/D-Log M' is rejected "
+                   "(returns False) and no D-Log M string exists anywhere in the "
+                   "application binary. D-Log M is not a niche mode: it is the "
+                   "ONLY log profile the Osmo Pocket 3 offers, and the same curve "
+                   "ships on Mavic 3 / Action 4 / Mini 4 Pro. So RCM cannot "
+                   "interpret that footage at all. Substituting the D-Log space is "
+                   "not a workaround — decoding D-Log M with the steeper D-Log "
+                   "inverse was rendered and compared: shadows crush to black and "
+                   "highlights blow to flat white.",
+        "recommended": "Tag the clip 'Rec.709 (Scene)' and put DJI's official "
+                       "'D-Log M to Rec.709' cube on the colour GROUP's pre-clip "
+                       "node graph via SetLUT — one node covers every shot and "
+                       "clip node 1 stays free for the per-clip CDL. Never "
+                       "substitute 'DJI D-Gamut/D-Log'.",
+        "tags": ["color-management", "input-colorspace", "missing-colorspace", "dji"],
+        "submit": "missing",
+    },
+    {
+        "symbol": "MediaPoolItem.SetClipProperty('Input LUT')",
+        "object": "MediaPoolItem",
+        "signature": "(key, value) -> bool",
+        "reality": "'Input LUT' comes back from GetClipProperty (empty string when "
+                   "unset), so it reads like a writable clip property, but "
+                   "SetClipProperty refuses every value form tried — LUT-dir "
+                   "relative path, absolute path, and bare filename — returning "
+                   "False even for a LUT that Resolve itself ships and that "
+                   "nodeGraph.SetLUT accepts in the same session. The clip-level "
+                   "input LUT slot is therefore read-only from the API: a "
+                   "read/write asymmetry with no error explaining the refusal.",
+        "recommended": "Use nodeGraph.SetLUT on clip node 1, or on the colour "
+                       "group's pre-clip graph when one transform should cover "
+                       "every shot. Note SetLUT does not resolve the USER LUT "
+                       "directory — stage the cube under the master LUT dir and "
+                       "reference it from there.",
+        "tags": ["clip-properties", "lut", "read-only", "read-write-asymmetry"],
+        "submit": "bug",
+    },
 ]
 
 

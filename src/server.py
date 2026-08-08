@@ -21768,6 +21768,9 @@ def _resolve_lut_export_type(export_type, resolve_obj=None):
     return const_name, None
 
 
+_CDL_KEYS = ("NodeIndex", "Slope", "Offset", "Power", "Saturation")
+
+
 def _validate_cdl_payload(cdl):
     if not isinstance(cdl, dict):
         return None, _err(
@@ -21777,6 +21780,18 @@ def _validate_cdl_payload(cdl):
             remediation="Pass cdl as a dict with NodeIndex, Slope, Offset, Power, Saturation.",
         )
     errors = []
+    # Resolve's SetCDL is case-sensitive and refuses the whole call on an unknown key, so an
+    # unflagged lowercase "offset" would validate clean and then silently apply nothing.
+    canonical = {key.lower(): key for key in _CDL_KEYS}
+    for key in cdl:
+        if key in _CDL_KEYS:
+            continue
+        suggestion = canonical.get(str(key).lower())
+        errors.append(
+            f"unknown key {key!r} - did you mean {suggestion!r}?"
+            if suggestion
+            else f"unknown key {key!r} - expected one of {', '.join(_CDL_KEYS)}"
+        )
     node_index = cdl.get("NodeIndex", 1)
     if isinstance(node_index, bool):
         errors.append("NodeIndex must be an integer")
@@ -21787,8 +21802,7 @@ def _validate_cdl_payload(cdl):
                 errors.append("NodeIndex must be >= 1")
         except (TypeError, ValueError):
             errors.append("NodeIndex must be an integer")
-    normalized = dict(cdl)
-    normalized["NodeIndex"] = node_index
+    normalized = {"NodeIndex": node_index}
     for key in ("Slope", "Offset", "Power"):
         value = cdl.get(key, [1.0, 1.0, 1.0] if key != "Offset" else [0.0, 0.0, 0.0])
         if isinstance(value, str):
