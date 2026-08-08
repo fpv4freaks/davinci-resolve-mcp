@@ -4,6 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from src.server import (
+    _CDL_KEYS,
     _gallery_capabilities,
     _grade_boundary_report,
     _grade_capabilities,
@@ -160,6 +161,30 @@ class ColorGradeProbeTest(unittest.TestCase):
         self.assertTrue(validation["valid"])
         self.assertEqual(validation["cdl"]["NodeIndex"], 1)
         self.assertEqual(validation["cdl"]["Offset"], [0.0, 0.0, 0.0])
+
+    def test_validate_cdl_payload_rejects_wrong_case_keys(self):
+        """Lowercase keys used to validate clean, then silently apply a no-op."""
+        validation, err = _validate_cdl_payload(
+            {
+                "slope": [1.0, 1.0, 1.0],
+                "offset": [0.05, 0.05, 0.05],
+                "power": [1.0, 1.0, 1.0],
+                "saturation": 1.0,
+            }
+        )
+
+        self.assertIsNone(err)
+        self.assertFalse(validation["valid"])
+        self.assertIn("'Offset'", " ".join(validation["errors"]))
+        # nothing unrecognised may reach Resolve - SetCDL refuses the whole call on one
+        self.assertEqual(set(validation["cdl"]), set(_CDL_KEYS))
+
+    def test_validate_cdl_payload_rejects_unknown_key(self):
+        validation, err = _validate_cdl_payload({"Offset": [0.0, 0.0, 0.0], "Wibble": 1})
+
+        self.assertIsNone(err)
+        self.assertFalse(validation["valid"])
+        self.assertIn("Wibble", " ".join(validation["errors"]))
 
     def test_safe_set_cdl_dry_run_does_not_mutate(self):
         item = ItemStub()

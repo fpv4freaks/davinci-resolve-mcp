@@ -12,7 +12,7 @@ that none exists).
 
 **Verified on:** DaVinci Resolve Studio 21.0.0
 
-**Totals:** 21 missing capabilities, 20 bugs / unreliable behaviors.
+**Totals:** 22 missing capabilities, 21 bugs / unreliable behaviors.
 
 The authoritative source is the runtime-queryable `api_truth` ledger
 (`resolve_control api_truth "<query>"`); this document is generated from
@@ -192,6 +192,14 @@ equivalent, blocking full automation.
 - **Workaround / current handling:** Check GetRenderCodecs(format) first; when it is empty, treat the format as unreachable through this API rather than guessing a codec value. Render audio-only via ExportVideo=False on a format that does expose codecs, or drive it from a saved render preset.
 - **Tags:** render, deliver, audio, unsupported
 
+### MediaPoolItem.SetClipProperty('Input Color Space') — no DJI D-Log M
+
+- **Object:** `MediaPoolItem`
+- **Signature:** `(key, value) -> bool`
+- **Behavior:** Resolve 21.0.3 ships exactly one DJI input colour space, 'DJI D-Gamut/D-Log'. 'DJI D-Gamut/D-Log M' is rejected (returns False) and no D-Log M string exists anywhere in the application binary. D-Log M is not a niche mode: it is the ONLY log profile the Osmo Pocket 3 offers, and the same curve ships on Mavic 3 / Action 4 / Mini 4 Pro. So RCM cannot interpret that footage at all. Substituting the D-Log space is not a workaround — decoding D-Log M with the steeper D-Log inverse was rendered and compared: shadows crush to black and highlights blow to flat white.
+- **Workaround / current handling:** Tag the clip 'Rec.709 (Scene)' and put DJI's official 'D-Log M to Rec.709' cube on the colour GROUP's pre-clip node graph via SetLUT — one node covers every shot and clip node 1 stays free for the per-clip CDL. Never substitute 'DJI D-Gamut/D-Log'.
+- **Tags:** color-management, input-colorspace, missing-colorspace, dji
+
 ## Bugs / Unreliable Behavior (please fix)
 
 Methods that exist but misbehave — silent failures, unreliable return
@@ -352,3 +360,11 @@ values, or automation-hostile modal prompts.
 - **Behavior:** PANEL-dependent, not mode-dependent — and the distinction took three revisions of this entry to pin down, so the evidence is recorded rather than summarised. Across four controlled 92-probe sweeps (2 GUI, 2 headless, 2026-08-01) it returned False and wrote nothing in ALL FOUR, while Timeline.GrabStill() succeeded in all four — so it is not being handed an empty still. In one earlier GUI session it DID work, returning True and writing 2 files. The variable that differed is not the mode: it is whether the Gallery panel was visible on the Color page, which depends on the restored workspace layout and which the harness does not control. A headless session can never satisfy it, so in practice the call never works headless; a GUI session satisfies it only sometimes. Project.ExportCurrentFrameAsStill worked in all four runs in both modes.
 - **Workaround / current handling:** Do not use ExportStills unattended in either mode — a GUI session is not sufficient, only a GUI session with the Gallery panel open. Use Project.ExportCurrentFrameAsStill for pixels (verified in both modes, four for four) or drp.extract_node_graphs for grades. If ExportStills must be used, have the user open Workspace > Gallery first and verify the written files rather than trusting the return.
 - **Tags:** gallery, stills, headless, unreliable-return
+
+### MediaPoolItem.SetClipProperty('Input LUT')
+
+- **Object:** `MediaPoolItem`
+- **Signature:** `(key, value) -> bool`
+- **Behavior:** 'Input LUT' comes back from GetClipProperty (empty string when unset), so it reads like a writable clip property, but SetClipProperty refuses every value form tried — LUT-dir relative path, absolute path, and bare filename — returning False even for a LUT that Resolve itself ships and that nodeGraph.SetLUT accepts in the same session. The clip-level input LUT slot is therefore read-only from the API: a read/write asymmetry with no error explaining the refusal.
+- **Workaround / current handling:** Use nodeGraph.SetLUT on clip node 1, or on the colour group's pre-clip graph when one transform should cover every shot. Note SetLUT does not resolve the USER LUT directory — stage the cube under the master LUT dir and reference it from there.
+- **Tags:** clip-properties, lut, read-only, read-write-asymmetry
