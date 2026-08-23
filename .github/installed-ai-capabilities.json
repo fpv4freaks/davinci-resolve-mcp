@@ -1,13 +1,85 @@
 {
   "installed": [
     {
+      "id": "docs-to-markdown",
+      "category": "skill",
+      "source": "mcaps-microsoft/ISDAIFirstAiBS",
+      "branch": "main",
+      "targetPath": ".github/skills/docs-to-markdown",
+      "sha": "a2e6733020a8b4ad46c9a50fe1027e84b9df7126"
+    },
+    {
+      "id": "excel-to-markdown",
+      "category": "skill",
+      "source": "mcaps-microsoft/ISDAIFirstAiBS",
+      "branch": "main",
+      "targetPath": ".github/skills/excel-to-markdown",
+      "sha": "d4bc918560de3c219a280a6e7c1af01fcebc5366"
+    },
+    {
+      "id": "docx",
+      "category": "skill",
+      "source": "mcaps-microsoft/ISDAIFirstAiBS",
+      "branch": "main",
+      "targetPath": ".github/skills/docx",
+      "sha": "03d9c624daf806c43e5f2e5df9e6930f53c98348"
+    },
+    {
+      "id": "hyperframes-unified",
+      "category": "skill",
+      "source": "mcaps-microsoft/ISDAIFirstAiBS",
+      "branch": "main",
+      "targetPath": ".github/skills/hyperframes-unified",
+      "sha": "e416be433d5decd15080a3ed349b9c04be123ba0"
+    },
+    {
       "id": "safe-push",
       "category": "skill",
       "source": "mcaps-microsoft/ISDAIFirstAiBS",
       "branch": "main",
       "targetPath": ".github/skills/safe-push",
-      "sha": "35df3af2ebfc99ccfa7e4d9cab7a22b0fbfa9250"
+      "sha": "d76414c86a83d25b9461ebe27afa1ceee479b665"
+    },
+    {
+      "id": "create-repo",
+      "category": "skill",
+      "source": "mcaps-microsoft/ISDAIFirstAiBS",
+      "branch": "main",
+      "targetPath": ".github/skills/create-repo",
+      "sha": "15a8f27ded6241b6462b1b52c554b9eeead15f2c"
+    },
+    {
+      "id": "xlsx",
+      "category": "skill",
+      "source": "mcaps-microsoft/ISDAIFirstAiBS",
+      "branch": "main",
+      "targetPath": ".github/skills/xlsx",
+      "sha": "3f3bdae40d37a61d6314601c787cdc1f60de1675"
+    },
+    {
+      "id": "skill-creator",
+      "category": "skill",
+      "source": "mcaps-microsoft/ISDAIFirstAiBS",
+      "branch": "main",
+      "targetPath": ".github/skills/skill-creator",
+      "sha": "6c6f4eaf2cdf47018337ebaa695b12cbcf8557d7"
+    },
+    {
+      "id": "setup-multirepo-workspace",
+      "category": "prompt",
+      "source": "mcaps-microsoft/ISDAIFirstAiBS",
+      "branch": "main",
+      "targetPath": ".github/prompts/setup-multirepo-workspace.prompt.md",
+      "sha": "044c6bbdd5e40950e5e8bd791616e60603c6800c"
+    },
+    {
+      "id": "aifirst-setupcheck",
+      "category": "prompt",
+      "source": "mcaps-microsoft/ISDAIFirstAiBS",
+      "branch": "main",
+      "targetPath": ".github/prompts/aifirst-setupcheck.prompt.md",
+      "sha": "5c944a587d35bb91af519185ecff02b5bccc5fdb"
     }
   ],
-  "updatedAt": "2026-08-03T16:33:19.443Z"
+  "updatedAt": "2026-08-23T09:12:21.576Z"
 }

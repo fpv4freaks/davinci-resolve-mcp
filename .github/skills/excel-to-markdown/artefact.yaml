@@ -1,0 +1,89 @@
+# artefact.yaml — excel-to-markdown metadata for catalog indexing
+# All valid enum values are documented in .github/skills/skill-creator/references/mappings-reference.md
+
+# --- IDENTITY (required) ---
+name: "excel-to-markdown"
+description: "Deprecated — superseded by docs-to-markdown. Use docs-to-markdown to convert Excel (.xlsx, .xls), Word, PowerPoint, and PDF files to Markdown. Retained only for backward compatibility."
+
+# --- OWNERSHIP (required) ---
+author: "Balázs Skorka"
+maintainers:
+  - "@bskorka_microsoft"
+support: ""
+
+# --- VERSION & LIFECYCLE (required) ---
+version: "1.0"
+created: 2026-04-01
+updated: 2026-04-07
+license: "MIT"
+status: deprecated
+
+# --- CLASSIFICATION (required) ---
+type: skill
+category: productivity
+installer-group: productivity
+roles:
+  - all
+phases:
+  - all
+
+# --- METHODOLOGY MAPPING (recommended) ---
+methodologies:
+  - SureStep365
+
+surestep365:
+  phases:
+    - all
+  activities:
+    - code: "all"
+      name: "All activities"
+
+# --- COMPATIBILITY & PREREQUISITES (recommended) ---
+compatibility:
+  vs_code: ">=1.85"
+  copilot: "Agent mode required"
+prerequisites:
+  mcp_servers: []
+  cli_tools: []
+  python_packages:
+    - name: "openpyxl"
+      purpose: "Read Excel spreadsheets"
+      required: true
+      install: "pip install openpyxl"
+  npm_packages: []
+  extensions: []
+  environment: []
+
+# --- DOCUMENTATION (recommended) ---
+documentation: "https://github.com/mcaps-microsoft/ISDAIFirstAiBS/blob/main/.github/skills/excel-to-markdown/README.md"
+repo: "mcaps-microsoft/ISDAIFirstAiBS"
+project: ""
+
+# --- PRODUCT MAPPING (recommended) ---
+product-family:
+  - cross-cutting
+products:
+  - pure-business
+
+# --- TECHNOLOGIES & TAGS (optional) ---
+technologies:
+  - python
+  - github-copilot
+tags:
+  - excel
+  - markdown
+  - conversion
+  - tables
+  - spreadsheets
+allowed-tools: ""
+distribution:
+  rapid-module:
+    enabled: false
+    namespace-safe: false
+    self-contained: false
+    mode: supporting
+    required-skills: []
+    conflicts-with: []
+    plane-access:
+      reads: []
+      writes: []

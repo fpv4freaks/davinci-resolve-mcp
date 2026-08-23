@@ -1,0 +1,105 @@
+# artefact.yaml — skill-creator metadata for catalog indexing
+# All valid enum values are documented in .github/skills/skill-creator/references/mappings-reference.md
+
+# --- IDENTITY (required) ---
+name: "skill-creator"
+description: "Create new skills, modify and improve existing skills, and measure skill performance. Guides through the full lifecycle: draft, test, evaluate, iterate, optimize description for triggering accuracy, and package."
+
+# --- OWNERSHIP (required) ---
+author: "www.anthropic.com"
+maintainers:
+  - "@dandreje_microsoft"
+  - "@dwojcik_microsoft"
+  - "@vdrobkov_microsoft"
+support: "dwojcik@microsoft.com"
+
+# --- VERSION & LIFECYCLE (required) ---
+version: "1.4"
+created: 2026-03-01
+updated: 2026-08-21
+license: "Apache-2.0"
+status: production
+
+# --- CLASSIFICATION (required) ---
+type: skill
+category: technical
+installer-group: productivity
+roles:
+  - technical-consultant
+  - solution-architect
+  - functional-consultant
+phases:
+  - build
+
+# --- METHODOLOGY MAPPING (recommended) ---
+methodologies:
+  - SureStep365
+
+surestep365:
+  phases:
+    - config-dev-sprints
+  activities:
+    - code: "05-04"
+      name: "Configuration & Development activity set"
+
+# --- RAPID MODULE ASSESSMENT (required; distribution is explicit opt-in) ---
+distribution:
+  rapid-module:
+    enabled: false
+    namespace-safe: false
+    self-contained: false
+    mode: supporting
+    required-skills: []
+    conflicts-with: []
+    plane-access:
+      reads: []
+      writes: []
+
+# --- COMPATIBILITY & PREREQUISITES (recommended) ---
+compatibility:
+  vs_code: ">=1.85"
+  copilot: "Agent mode required"
+prerequisites:
+  mcp_servers: []
+  cli_tools:
+    - name: "Git"
+      purpose: "Refresh the canonical RAPID methodology registry from its source repository"
+      required: false
+      install: "winget install Git.Git"
+      verify: "git --version"
+    - name: "Python 3.x"
+      purpose: "Run eval scripts, benchmark aggregation, description optimization, and RAPID registry synchronization"
+      required: false
+      install: "winget install Python.Python.3.12"
+      verify: "python --version"
+  python_packages:
+    - name: "PyYAML"
+      purpose: "Parse canonical RAPID task frontmatter during registry synchronization"
+      required: false
+      install: "pip install pyyaml"
+  npm_packages: []
+  extensions: []
+  environment: []
+
+# --- DOCUMENTATION (recommended) ---
+documentation: "https://github.com/mcaps-microsoft/ISDAIFirstAiBS/blob/main/.github/skills/skill-creator/README.md"
+repo: "mcaps-microsoft/ISDAIFirstAiBS"
+project: ""
+
+# --- PRODUCT MAPPING (recommended) ---
+product-family:
+  - cross-cutting
+products:
+  - all
+
+# --- TECHNOLOGIES & TAGS (optional) ---
+technologies:
+  - python
+  - github-copilot
+tags:
+  - skill-authoring
+  - evaluation
+  - benchmarking
+  - description-optimization
+  - copilot-skills
+allowed-tools: ""

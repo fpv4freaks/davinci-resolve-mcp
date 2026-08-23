@@ -1,0 +1,11 @@
+{
+  "eval_id": 2, "eval_name": "path-a-all-inputs-provided",
+  "expectations": [
+    {"text": "uses-provided-name", "passed": true, "evidence": "my-cool-project extracted from prompt arguments"},
+    {"text": "uses-public-visibility", "passed": true, "evidence": "public extracted → --public flag"},
+    {"text": "includes-description", "passed": true, "evidence": "--description present in command template"},
+    {"text": "no-unnecessary-questions", "passed": true, "evidence": "Pre-filled via vscode_askQuestions, only owner needs defaulting"},
+    {"text": "skips-gitignore-prompt", "passed": true, "evidence": ".gitignore exists → question skipped"}
+  ],
+  "issues_found": []
+}

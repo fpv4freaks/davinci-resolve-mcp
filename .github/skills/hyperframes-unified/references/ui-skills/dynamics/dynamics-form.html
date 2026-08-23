@@ -1,0 +1,609 @@
+<template id="dynamics-form-template">
+<div data-composition-id="dynamics-form" data-width="1920" data-height="1080">
+
+  <!-- ===== TOP NAV ===== -->
+  <div class="d365-topnav">
+    <div class="d365-topnav__left">
+      <span class="d365-topnav__btn">&#8862;</span>
+      <div class="d365-topnav__logo">
+        <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+          <rect width="9" height="9" fill="#F25022"/>
+          <rect x="11" width="9" height="9" fill="#7FBA00"/>
+          <rect y="11" width="9" height="9" fill="#00A4EF"/>
+          <rect x="11" y="11" width="9" height="9" fill="#FFB900"/>
+        </svg>
+        <span>Dynamics 365</span>
+      </div>
+      <span class="d365-topnav__appname" id="d365-app-name">Sales Hub</span>
+    </div>
+    <div class="d365-topnav__search">
+      <span style="color:#fff;font-size:14px;opacity:0.6">&#128269;</span>
+      <span style="color:#fff;opacity:0.6;font-size:13px">Search</span>
+    </div>
+    <div class="d365-topnav__right">
+      <span class="d365-topnav__btn">&#128161;</span>
+      <span class="d365-topnav__btn">+</span>
+      <span class="d365-topnav__btn">&#128276;</span>
+      <span class="d365-topnav__btn">&#9881;</span>
+      <span class="d365-topnav__btn">?</span>
+      <span class="d365-topnav__btn">&#128101;</span>
+      <div class="d365-topnav__copilot">
+        <span>&#10024;</span><span>Copilot</span><span style="font-size:10px">&#9660;</span>
+      </div>
+      <div class="d365-topnav__avatar" id="d365-nav-avatar">PK</div>
+    </div>
+  </div>
+
+  <!-- ===== MAIN LAYOUT ===== -->
+  <div class="d365-main">
+
+    <!-- SIDEBAR -->
+    <nav class="d365-sidebar">
+      <div class="d365-sidebar__hamburger">&#9776;</div>
+      <div class="d365-sidebar__item"><span class="d365-sidebar__icon">&#128225;</span> Agent feed</div>
+      <div class="d365-sidebar__item"><span class="d365-sidebar__icon">&#127968;</span> Home</div>
+      <div class="d365-sidebar__item"><span class="d365-sidebar__icon">&#128336;</span> Recent <span class="d365-sidebar__chevron">&#9660;</span></div>
+      <div class="d365-sidebar__item"><span class="d365-sidebar__icon">&#128204;</span> Pinned <span class="d365-sidebar__chevron">&#9660;</span></div>
+      <div class="d365-sidebar__section-title">My Work</div>
+      <div class="d365-sidebar__item"><span class="d365-sidebar__icon">&#9889;</span> Sales accelerator</div>
+      <div class="d365-sidebar__item"><span class="d365-sidebar__icon">&#10003;</span> Activities</div>
+      <div class="d365-sidebar__item"><span class="d365-sidebar__icon">&#128202;</span> Dashboards</div>
+      <div class="d365-sidebar__item"><span class="d365-sidebar__icon">&#129302;</span> Sales Research Agent</div>
+      <div class="d365-sidebar__section-title">Customers</div>
+      <div class="d365-sidebar__item"><span class="d365-sidebar__icon">&#127970;</span> Accounts</div>
+      <div class="d365-sidebar__item"><span class="d365-sidebar__icon">&#128100;</span> Contacts</div>
+      <div class="d365-sidebar__section-title">Sales</div>
+      <div class="d365-sidebar__item d365-sidebar__item--active"><span class="d365-sidebar__icon">&#128176;</span> Opportunities</div>
+      <div class="d365-sidebar__item"><span class="d365-sidebar__icon">&#9876;&#65039;</span> Competitors</div>
+      <div class="d365-sidebar__section-title">Sales Analytics</div>
+      <div class="d365-sidebar__item"><span class="d365-sidebar__icon">&#128200;</span> Sales Acceleration Re...</div>
+      <div class="d365-sidebar__bottom">
+        <span style="font-size:16px;color:#0F6CBD">S</span>
+        <span style="font-size:13px">Sales</span>
+        <span style="margin-left:auto;font-size:12px;color:#a19f9d">&#8693;</span>
+      </div>
+    </nav>
+
+    <!-- CONTENT AREA -->
+    <div class="d365-content">
+
+      <!-- COMMAND BAR -->
+      <div class="d365-commandbar">
+        <span class="d365-commandbar__btn">&#8592;</span>
+        <span class="d365-commandbar__btn">&#8599;</span>
+        <div class="d365-commandbar__divider"></div>
+        <span class="d365-commandbar__btn">&#128190; Save <span style="font-size:10px;color:#605e5c">&#9660;</span></span>
+        <div class="d365-commandbar__divider"></div>
+        <span class="d365-commandbar__btn">&#128425; Calculate</span>
+        <span class="d365-commandbar__btn">+ New</span>
+        <span class="d365-commandbar__btn">&#128101; Collaborate</span>
+        <span class="d365-commandbar__btn">&#10003; Close as won</span>
+        <span class="d365-commandbar__btn">&#10005; Close as lost</span>
+        <span class="d365-commandbar__btn">&#8943;</span>
+        <div class="d365-commandbar__right">
+          <div class="d365-commandbar__ai-warning">
+            <span>&#8226;</span><span>AI-generated content may be incorrect</span><span>&#9432;</span>
+          </div>
+          <span class="d365-commandbar__btn d365-commandbar__btn--outlined">&#8599; Share <span style="font-size:10px">&#9660;</span></span>
+        </div>
+      </div>
+
+      <!-- RECORD ISLAND -->
+      <div class="d365-island">
+        <!-- Record Header -->
+        <div class="d365-record-header">
+          <div class="d365-record-header__left">
+            <div class="d365-record-header__title" id="d365-record-title">
+              Test User - Calculation
+              <span class="d365-record-header__saved">- Saved</span>
+            </div>
+            <div class="d365-record-header__entity" id="d365-entity-name">Opportunity</div>
+          </div>
+          <div class="d365-record-header__fields">
+            <div class="d365-record-header__field">
+              <span class="d365-record-header__field-value">Low</span>
+              <span class="d365-record-header__field-label">Priority</span>
+            </div>
+            <div class="d365-record-header__field-divider"></div>
+            <div class="d365-record-header__field">
+              <span class="d365-record-header__field-value">---</span>
+              <span class="d365-record-header__field-label">Est. close date</span>
+            </div>
+            <div class="d365-record-header__field-divider"></div>
+            <div class="d365-record-header__field">
+              <span class="d365-record-header__field-value">---</span>
+              <span class="d365-record-header__field-label">Est. revenue</span>
+            </div>
+            <div class="d365-record-header__field-divider"></div>
+            <div class="d365-record-header__owner">
+              <div class="d365-avatar" id="d365-owner-avatar">PK</div>
+              <div>
+                <div class="d365-record-header__owner-name" id="d365-owner-name">Pavel Koval</div>
+                <div class="d365-record-header__field-label">Owner</div>
+              </div>
+              <span style="font-size:12px;color:#605e5c;cursor:pointer">&#9660;</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Business Process Flow -->
+        <div class="d365-bpf">
+          <div class="d365-bpf__label">
+            <span class="d365-bpf__label-title">Sales Process</span>
+            <span class="d365-bpf__label-sub">Active for 25 days</span>
+          </div>
+          <div class="d365-bpf__chevron">&#8249;</div>
+          <div class="d365-bpf__stages">
+            <div class="d365-bpf__track"></div>
+            <div class="d365-bpf__progress"></div>
+            <div class="d365-bpf__stage">
+              <div class="d365-bpf__circle d365-bpf__circle--completed">&#10003;</div>
+              <span class="d365-bpf__stage-name">Qualify</span>
+            </div>
+            <div class="d365-bpf__stage">
+              <div class="d365-bpf__circle d365-bpf__circle--active"><div class="d365-bpf__active-dot"></div></div>
+              <span class="d365-bpf__stage-name d365-bpf__stage-name--active">Develop</span>
+            </div>
+            <div class="d365-bpf__stage">
+              <div class="d365-bpf__circle"></div>
+              <span class="d365-bpf__stage-name">Propose</span>
+            </div>
+            <div class="d365-bpf__stage">
+              <div class="d365-bpf__circle"></div>
+              <span class="d365-bpf__stage-name">Close</span>
+            </div>
+          </div>
+          <div class="d365-bpf__chevron">&#8250;</div>
+        </div>
+
+        <!-- Tab Bar -->
+        <div class="d365-tabbar">
+          <div class="d365-tabbar__tabs">
+            <div class="d365-tabbar__tab d365-tabbar__tab--active">Summary</div>
+            <div class="d365-tabbar__tab">Relationship analytics</div>
+            <div class="d365-tabbar__tab">Opportunity Plan</div>
+            <div class="d365-tabbar__tab">Documents</div>
+            <div class="d365-tabbar__tab d365-tabbar__tab--related">Related <span style="font-size:10px">&#9660;</span></div>
+          </div>
+          <div class="d365-tabbar__form-assist">&#9998; Form assist</div>
+        </div>
+      </div>
+
+      <!-- FORM BODY (3 columns) -->
+      <div class="d365-form-body">
+
+        <!-- LEFT COLUMN -->
+        <div class="d365-form-col">
+          <div class="d365-section-card">
+            <div class="d365-section-card__title">Key details</div>
+            <div class="d365-field">
+              <div class="d365-field__label">Topic <span class="d365-field__required">*</span></div>
+              <div class="d365-field__input">Test User - Calculation</div>
+            </div>
+            <div class="d365-field">
+              <div class="d365-field__label">Potential Customer <span class="d365-field__required">*</span></div>
+              <div class="d365-field__lookup">
+                <div class="d365-field__lookup-pill">
+                  <span class="d365-field__lookup-icon">&#128100;</span>
+                  <span class="d365-field__lookup-value">Test User</span>
+                  <span class="d365-field__lookup-close">&#10005;</span>
+                </div>
+                <span class="d365-field__lookup-search">&#128269;</span>
+              </div>
+            </div>
+            <div class="d365-field">
+              <div class="d365-field__label">Contact</div>
+              <div class="d365-field__lookup">
+                <div class="d365-field__lookup-pill">
+                  <span class="d365-field__lookup-icon">&#128100;</span>
+                  <span class="d365-field__lookup-value">Test User</span>
+                  <span class="d365-field__lookup-close">&#10005;</span>
+                </div>
+                <span class="d365-field__lookup-search">&#128269;</span>
+              </div>
+            </div>
+            <div class="d365-field">
+              <div class="d365-field__label">Purchase timeframe</div>
+              <div class="d365-field__dropdown">
+                <span>---</span>
+                <span style="font-size:10px;color:#605e5c">&#9660;</span>
+              </div>
+            </div>
+            <div class="d365-field">
+              <div class="d365-field__label">Probability</div>
+              <div class="d365-field__input d365-field__input--empty">---</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- MIDDLE COLUMN -->
+        <div class="d365-form-col">
+          <div class="d365-section-card">
+            <div class="d365-section-card__title">Up next</div>
+            <div style="font-size:13px;font-weight:600;margin-bottom:4px">Manage your activities</div>
+            <div style="font-size:13px;color:#605e5c">See upcoming activities by connecting the opportunity to a sequence or by creating an activity.</div>
+          </div>
+          <div class="d365-section-card d365-timeline">
+            <div class="d365-timeline__header">
+              <span>Timeline</span>
+              <div class="d365-timeline__toolbar">
+                <button class="d365-timeline__tool-btn">+</button>
+                <button class="d365-timeline__tool-btn">&#128278;</button>
+                <button class="d365-timeline__tool-btn">&#128317;</button>
+                <button class="d365-timeline__tool-btn">&#10530;</button>
+                <button class="d365-timeline__tool-btn">&#128260;</button>
+                <button class="d365-timeline__tool-btn">&#8943;</button>
+              </div>
+            </div>
+            <div class="d365-timeline__search">
+              <span style="color:#605e5c;font-size:14px">&#128269;</span>
+              <span style="font-size:13px;color:#a19f9d">Search Timeline</span>
+            </div>
+            <div class="d365-timeline__note">
+              <span>&#9998;</span><span>Enter a note...</span><span style="margin-left:auto">&#128206;</span>
+            </div>
+            <div class="d365-timeline__entry">
+              <div class="d365-timeline__entry-header">
+                <div class="d365-timeline__entry-avatar">U</div>
+                <span>&#128197;</span>
+                <span class="d365-timeline__entry-type">Meeting</span>
+                <span class="d365-timeline__overdue">Overdue</span>
+              </div>
+              <div class="d365-timeline__entry-details">
+                <div>By: Home Insurance Advisory - Test User</div>
+                <div>Booked via online tool. Contact: test.computed@example.com</div>
+                <div>Modified on: 3/9/2026 3:22 PM</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- RIGHT COLUMN -->
+        <div class="d365-form-col">
+          <div class="d365-section-card d365-scorecard">
+            <div class="d365-scorecard__header">
+              <div class="d365-scorecard__title">Opportunity score <span style="font-size:14px;color:#605e5c">&#9432;</span></div>
+              <span style="font-size:16px;color:#605e5c;cursor:pointer">&#8943;</span>
+            </div>
+            <div class="d365-scorecard__body">
+              <span class="d365-scorecard__number">48</span>
+              <div class="d365-scorecard__details">
+                <span class="d365-scorecard__grade">Grade C</span>
+                <span class="d365-scorecard__trend">&#8594; Steady</span>
+              </div>
+            </div>
+            <div class="d365-scorecard__insight">
+              <span class="d365-scorecard__insight-icon">&#9650;</span>
+              <span>This opportunity shares many characteristics with others that were closed as won</span>
+            </div>
+          </div>
+          <div class="d365-section-card">
+            <div class="d365-section-card__title">Assistant</div>
+            <div style="font-size:13px;font-weight:600;margin-bottom:4px">Notifications</div>
+            <div style="font-size:13px;color:#605e5c;text-align:center;padding:16px 0">
+              No notifications or suggestions<br>
+              <span style="font-size:12px">Check back later to see what's new and stay up to date.</span>
+            </div>
+          </div>
+          <div class="d365-section-card d365-subgrid">
+            <div class="d365-subgrid__header">
+              <span class="d365-subgrid__title">Stakeholders</span>
+              <span style="font-size:16px;color:#605e5c;cursor:pointer">&#8943;</span>
+            </div>
+            <table class="d365-subgrid__table">
+              <thead><tr><th style="width:24px"><input type="checkbox"></th><th>Name &#8593;</th><th>Role &#8593;</th></tr></thead>
+              <tbody><tr><td><input type="checkbox"></td><td>Test User</td><td></td></tr></tbody>
+            </table>
+            <div class="d365-subgrid__pagination">Page 1</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== STYLES ===== -->
+  <style>
+    [data-composition-id="dynamics-form"] {
+      font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+      display: flex;
+      flex-direction: column;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #FAFAFA;
+      color: #242424;
+      font-size: 14px;
+    }
+
+    /* ---- TOP NAV ---- */
+    .d365-topnav {
+      display: flex; align-items: center; justify-content: space-between;
+      height: 48px; background-color: #1B1B3A; padding: 0 12px; flex-shrink: 0;
+    }
+    .d365-topnav__left { display: flex; align-items: center; gap: 8px; }
+    .d365-topnav__logo { display: flex; align-items: center; gap: 8px; color: #fff; font-size: 14px; font-weight: 600; }
+    .d365-topnav__appname { color: #fff; font-size: 13px; opacity: 0.85; margin-left: 8px; }
+    .d365-topnav__search {
+      display: flex; align-items: center; gap: 8px;
+      background-color: rgba(255,255,255,0.12); border-radius: 4px; padding: 6px 16px; min-width: 260px;
+    }
+    .d365-topnav__right { display: flex; align-items: center; gap: 4px; }
+    .d365-topnav__btn {
+      width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
+      color: #fff; cursor: pointer; font-size: 16px; opacity: 0.8;
+    }
+    .d365-topnav__copilot {
+      display: flex; align-items: center; gap: 6px;
+      background-color: rgba(255,255,255,0.12); border-radius: 4px; padding: 6px 12px; color: #fff; font-size: 13px; cursor: pointer;
+    }
+    .d365-topnav__avatar {
+      width: 28px; height: 28px; border-radius: 50%;
+      background-color: #0F6CBD; color: #fff; display: flex; align-items: center; justify-content: center;
+      font-size: 11px; font-weight: 600; margin-left: 4px;
+    }
+
+    /* ---- MAIN LAYOUT ---- */
+    .d365-main { display: flex; flex-grow: 1; overflow: hidden; }
+
+    /* ---- SIDEBAR ---- */
+    .d365-sidebar {
+      width: 220px; min-width: 220px; background-color: #F5F5F5;
+      border-right: 1px solid #e1e1e1; display: flex; flex-direction: column;
+      flex-shrink: 0; overflow-y: auto; font-size: 14px;
+    }
+    .d365-sidebar__hamburger {
+      display: flex; align-items: center; justify-content: center;
+      width: 40px; height: 40px; cursor: pointer; font-size: 18px; color: #242424; margin: 4px 8px;
+    }
+    .d365-sidebar__section-title { font-size: 14px; font-weight: 700; color: #242424; padding: 16px 16px 6px; }
+    .d365-sidebar__item {
+      display: flex; align-items: center; gap: 12px;
+      padding: 10px 16px; cursor: pointer; font-size: 14px; color: #242424;
+    }
+    .d365-sidebar__item--active {
+      border-left: 3px solid #0F6CBD; padding-left: 13px;
+      color: #0F6CBD; font-weight: 600; background-color: #fff;
+    }
+    .d365-sidebar__icon { font-size: 18px; color: #424242; width: 22px; display: flex; align-items: center; justify-content: center; }
+    .d365-sidebar__chevron { margin-left: auto; font-size: 10px; color: #a19f9d; }
+    .d365-sidebar__bottom {
+      margin-top: auto; border-top: 1px solid #e1e1e1; padding: 12px 16px;
+      display: flex; align-items: center; gap: 10px; cursor: pointer;
+    }
+
+    /* ---- CONTENT AREA ---- */
+    .d365-content {
+      flex-grow: 1; display: flex; flex-direction: column; overflow: hidden; background-color: #FAFAFA;
+    }
+
+    /* ---- COMMAND BAR ---- */
+    .d365-commandbar {
+      display: flex; align-items: center; height: 44px; background-color: #fff;
+      padding: 0 12px; gap: 4px; flex-shrink: 0; border-radius: 8px;
+      margin: 8px 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .d365-commandbar__btn {
+      display: flex; align-items: center; gap: 6px; padding: 6px 10px;
+      background-color: transparent; border: none; cursor: pointer; font-size: 13px;
+      color: #242424; border-radius: 4px; height: 32px;
+    }
+    .d365-commandbar__btn--outlined { border: 1px solid #e1e1e1; border-radius: 4px; }
+    .d365-commandbar__divider { width: 1px; height: 20px; background-color: #e1e1e1; margin: 0 4px; }
+    .d365-commandbar__right { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+    .d365-commandbar__ai-warning { display: flex; align-items: center; gap: 4px; font-size: 12px; color: #605e5c; }
+
+    /* ---- RECORD ISLAND ---- */
+    .d365-island {
+      margin: 8px 20px; border-radius: 8px; border: 1px solid #E0E0E0;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.08); background-color: #fff; flex-shrink: 0; overflow: hidden;
+    }
+
+    /* ---- RECORD HEADER ---- */
+    .d365-record-header { padding: 12px 20px; display: flex; justify-content: space-between; align-items: flex-start; }
+    .d365-record-header__title { font-size: 20px; font-weight: 600; color: #242424; display: flex; align-items: baseline; gap: 8px; }
+    .d365-record-header__saved { font-size: 14px; color: #605e5c; font-weight: 400; }
+    .d365-record-header__entity { font-size: 12px; color: #605e5c; margin-top: 2px; }
+    .d365-record-header__fields { display: flex; align-items: center; gap: 16px; }
+    .d365-record-header__field { display: flex; flex-direction: column; align-items: center; }
+    .d365-record-header__field-value { font-size: 14px; color: #242424; font-weight: 600; }
+    .d365-record-header__field-label { font-size: 11px; color: #605e5c; }
+    .d365-record-header__field-divider { width: 1px; height: 30px; background-color: #e1e1e1; }
+    .d365-record-header__owner { display: flex; align-items: center; gap: 8px; }
+    .d365-record-header__owner-name { font-size: 13px; font-weight: 600; color: #0F6CBD; }
+    .d365-avatar {
+      width: 32px; height: 32px; border-radius: 50%; background-color: #0F6CBD; color: #fff;
+      display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 600;
+    }
+
+    /* ---- BPF ---- */
+    .d365-bpf { padding: 12px 16px 8px; background-color: #fff; display: flex; align-items: flex-end; height: 56px; }
+    .d365-bpf__label {
+      display: flex; flex-direction: column; justify-content: center;
+      background-color: #0F6CBD; color: #fff; border-radius: 4px 0 0 4px;
+      padding: 0 16px; min-width: 150px; height: 42px; flex-shrink: 0; z-index: 2;
+    }
+    .d365-bpf__label-title { font-size: 14px; font-weight: 600; }
+    .d365-bpf__label-sub { font-size: 11px; opacity: 0.85; }
+    .d365-bpf__chevron {
+      display: flex; align-items: center; justify-content: center; width: 28px; height: 42px;
+      cursor: pointer; color: #a19f9d; flex-shrink: 0; z-index: 2;
+      background-color: #fff; border: 1px solid #E0E0E0; font-size: 18px;
+    }
+    .d365-bpf__stages {
+      display: flex; align-items: stretch; flex-grow: 1; position: relative;
+    }
+    .d365-bpf__track {
+      position: absolute; top: 24px; left: 0; right: 0; height: 4px; background-color: #C8C6C4; z-index: 0;
+    }
+    .d365-bpf__progress {
+      position: absolute; top: 24px; left: 0; width: 37.5%; height: 4px; background-color: #484644; z-index: 1;
+    }
+    .d365-bpf__stage {
+      display: flex; flex-direction: column; align-items: center;
+      flex-grow: 1; flex-basis: 0; height: 56px; position: relative;
+      cursor: pointer; padding-top: 10px;
+      background: linear-gradient(to bottom, #ffffff 28px, #F0F0F0 28px);
+    }
+    .d365-bpf__circle {
+      width: 24px; height: 24px; border-radius: 50%; border: 3px solid #8A8886;
+      display: flex; align-items: center; justify-content: center;
+      background-color: #fff; box-sizing: content-box; z-index: 2; font-size: 14px; font-weight: 700;
+    }
+    .d365-bpf__circle--completed { border-color: #0F6CBD; background-color: #0F6CBD; color: #fff; }
+    .d365-bpf__circle--active { border-color: #0F6CBD; background-color: #fff; }
+    .d365-bpf__active-dot { width: 12px; height: 12px; border-radius: 50%; background-color: #0F6CBD; }
+    .d365-bpf__stage-name { font-size: 12px; color: #605e5c; margin-top: 4px; }
+    .d365-bpf__stage-name--active { color: #0F6CBD; font-weight: 600; }
+
+    /* ---- TAB BAR ---- */
+    .d365-tabbar {
+      padding: 0 20px; background-color: #fff; display: flex; align-items: center;
+      justify-content: space-between; border-top: 1px solid #E0E0E0;
+    }
+    .d365-tabbar__tabs { display: flex; gap: 0; }
+    .d365-tabbar__tab {
+      padding: 10px 16px; font-size: 13px; cursor: pointer;
+      color: #605e5c; font-weight: 400; border-bottom: 3px solid transparent;
+    }
+    .d365-tabbar__tab--active { color: #242424; font-weight: 600; border-bottom-color: #0F6CBD; }
+    .d365-tabbar__tab--related { display: flex; align-items: center; gap: 4px; }
+    .d365-tabbar__form-assist {
+      display: flex; align-items: center; gap: 6px; padding: 6px 12px;
+      border: 1px solid #E0E0E0; border-radius: 4px; font-size: 13px;
+      cursor: pointer; color: #242424; background-color: #fff;
+    }
+
+    /* ---- FORM BODY ---- */
+    .d365-form-body {
+      display: grid; grid-template-columns: 1fr 1fr 1fr; column-gap: 8px;
+      flex-grow: 1; overflow-y: auto; padding: 8px 20px; background-color: #FAFAFA;
+    }
+    .d365-form-col { padding: 4px 0; display: flex; flex-direction: column; gap: 8px; }
+
+    /* ---- SECTION CARD ---- */
+    .d365-section-card {
+      background-color: #fff; border-radius: 8px; border: 1px solid #E0E0E0;
+      padding: 16px 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.08);
+    }
+    .d365-section-card__title { font-size: 15px; font-weight: 600; color: #242424; margin-bottom: 16px; }
+
+    /* ---- FORM FIELDS ---- */
+    .d365-field { display: flex; flex-direction: column; margin-bottom: 12px; }
+    .d365-field__label { font-size: 12px; color: #605e5c; margin-bottom: 4px; display: flex; align-items: center; gap: 4px; }
+    .d365-field__required { color: #d13438; font-size: 12px; }
+    .d365-field__input {
+      font-size: 14px; color: #242424; padding: 4px 8px; min-height: 28px;
+      display: flex; align-items: center; border: 1px solid #E1DFDD; border-radius: 4px; background-color: #F5F5F5;
+    }
+    .d365-field__input--empty { color: #a19f9d; }
+    .d365-field__lookup {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 4px 8px; min-height: 28px; border: 1px solid #E1DFDD; border-radius: 4px; background-color: #F5F5F5;
+    }
+    .d365-field__lookup-pill {
+      display: flex; align-items: center; gap: 6px;
+      background-color: #EBF3FC; border-radius: 4px; padding: 2px 8px; font-size: 13px;
+    }
+    .d365-field__lookup-icon { font-size: 14px; color: #0F6CBD; }
+    .d365-field__lookup-value { color: #0F6CBD; font-size: 13px; }
+    .d365-field__lookup-close { font-size: 12px; color: #605e5c; cursor: pointer; margin-left: 4px; }
+    .d365-field__lookup-search { color: #605e5c; cursor: pointer; font-size: 14px; }
+    .d365-field__dropdown {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 4px 8px; min-height: 28px; border: 1px solid #E1DFDD; border-radius: 4px;
+      background-color: #F5F5F5; font-size: 14px; color: #242424; cursor: pointer;
+    }
+
+    /* ---- TIMELINE ---- */
+    .d365-timeline__header {
+      display: flex; justify-content: space-between; align-items: center;
+      font-size: 14px; font-weight: 600; margin-bottom: 8px;
+    }
+    .d365-timeline__toolbar { display: flex; gap: 2px; }
+    .d365-timeline__tool-btn {
+      width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+      background-color: transparent; border: none; cursor: pointer; font-size: 12px;
+      border-radius: 4px; color: #605e5c;
+    }
+    .d365-timeline__search {
+      display: flex; align-items: center; gap: 8px;
+      padding: 6px 8px; border: 1px solid #E0E0E0; border-radius: 4px; margin-bottom: 8px;
+    }
+    .d365-timeline__note {
+      display: flex; align-items: center; gap: 8px; padding: 8px;
+      border-bottom: 1px solid #e1e1e1; color: #a19f9d; font-size: 13px;
+      cursor: pointer; margin-bottom: 8px;
+    }
+    .d365-timeline__entry { padding: 8px 0; border-bottom: 1px solid #E0E0E0; }
+    .d365-timeline__entry-header { display: flex; align-items: center; gap: 8px; }
+    .d365-timeline__entry-avatar {
+      width: 28px; height: 28px; border-radius: 50%; background-color: #B4B4B4;
+      color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 600;
+    }
+    .d365-timeline__entry-type { font-size: 13px; font-weight: 600; color: #242424; }
+    .d365-timeline__overdue {
+      background-color: #FDE7E9; color: #d13438; font-size: 11px; padding: 1px 8px;
+      border-radius: 4px; font-weight: 600;
+    }
+    .d365-timeline__entry-details { padding-left: 36px; font-size: 12px; color: #605e5c; line-height: 18px; }
+
+    /* ---- SCORECARD ---- */
+    .d365-scorecard__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .d365-scorecard__title { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; color: #242424; }
+    .d365-scorecard__body { display: flex; align-items: center; gap: 16px; margin-bottom: 12px; }
+    .d365-scorecard__number { font-size: 40px; font-weight: 600; color: #242424; }
+    .d365-scorecard__details { display: flex; flex-direction: column; }
+    .d365-scorecard__grade { font-size: 14px; font-weight: 600; color: #242424; }
+    .d365-scorecard__trend { font-size: 13px; color: #605e5c; }
+    .d365-scorecard__insight {
+      display: flex; align-items: flex-start; gap: 6px; font-size: 13px; color: #242424;
+      padding: 8px 12px; background-color: #F3FFF3; border-radius: 4px; margin-bottom: 8px;
+    }
+    .d365-scorecard__insight-icon { color: #107C10; font-size: 12px; margin-top: 2px; }
+
+    /* ---- SUBGRID ---- */
+    .d365-subgrid__header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .d365-subgrid__title { font-size: 14px; font-weight: 600; color: #242424; }
+    .d365-subgrid__table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .d365-subgrid__table th {
+      text-align: left; padding: 6px 8px; font-size: 12px; color: #605e5c;
+      font-weight: 600; border-bottom: 1px solid #E0E0E0;
+    }
+    .d365-subgrid__table td { padding: 6px 8px; font-size: 13px; color: #242424; border-bottom: 1px solid #E0E0E0; }
+    .d365-subgrid__pagination { display: flex; justify-content: flex-end; padding: 6px 0 0; font-size: 12px; color: #a19f9d; }
+  </style>
+
+  <!-- ===== ANIMATION ===== -->
+  <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+  <script>
+    window.__timelines = window.__timelines || {};
+    const tl = gsap.timeline({ paused: true });
+
+    // Staggered entrance: top nav slides in
+    tl.from(".d365-topnav", { y: -48, opacity: 0, duration: 0.5, ease: "power3.out" }, 0.1);
+
+    // Sidebar slides in from left
+    tl.from(".d365-sidebar", { x: -220, opacity: 0, duration: 0.6, ease: "expo.out" }, 0.2);
+
+    // Command bar fades in
+    tl.from(".d365-commandbar", { y: -20, opacity: 0, duration: 0.4, ease: "power2.out" }, 0.4);
+
+    // Record island fades in
+    tl.from(".d365-island", { y: 30, opacity: 0, duration: 0.6, ease: "power3.out" }, 0.5);
+
+    // Form columns stagger in
+    tl.from(".d365-form-col", {
+      y: 40, opacity: 0, duration: 0.5, ease: "power2.out",
+      stagger: 0.15,
+    }, 0.8);
+
+    // Section cards stagger in
+    tl.from(".d365-section-card", {
+      y: 20, opacity: 0, duration: 0.4, ease: "power2.out",
+      stagger: 0.1,
+    }, 1.0);
+
+    window.__timelines["dynamics-form"] = tl;
+  </script>
+</div>
+</template>

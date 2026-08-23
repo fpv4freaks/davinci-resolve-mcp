@@ -1,0 +1,245 @@
+{
+  "skill_name": "docs-to-markdown",
+  "evals": [
+    {
+      "id": 1,
+      "prompt": "I want to convert some Word documents to markdown. I've never used this skill before.",
+      "expected_output": "Should start Phase 1: present the dependency list, explain each package, and ask the user for explicit approval before installing anything. Should use vscode_askQuestions with Yes/No options. Should NOT run pip install without approval.",
+      "files": [],
+      "expectations": [
+        "Should present the full dependency list before any installation",
+        "Should use vscode_askQuestions to ask for install approval",
+        "Should NOT run pip install before the user approves",
+        "Should list pywin32 as optional (Windows only), not as mandatory"
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "No, cancel. I don't want to install anything right now.",
+      "expected_output": "Should stop immediately after the user declines dependency installation. Should tell the user the skill cannot run without dependencies. Should NOT proceed to Phase 2 or any other phase.",
+      "files": [],
+      "expectations": [
+        "Should stop immediately — no further phases",
+        "Should tell user the skill cannot run without dependencies",
+        "Should NOT ask about folders or run any conversion",
+        "Should invite user to come back when ready"
+      ]
+    },
+    {
+      "id": 3,
+      "prompt": "Yes, install dependencies.",
+      "expected_output": "Should run pip install for the mandatory packages only (python-docx, openpyxl, python-pptx, xlrd, msoffcrypto-tool, PyMuPDF). Should then separately ask if the user also wants pywin32 for IRM/legacy file support. Should NOT include pywin32 in the mandatory install command.",
+      "files": [],
+      "expectations": [
+        "Should run pip install with exactly the 6 mandatory packages",
+        "Should NOT include pywin32 in the mandatory pip install command",
+        "Should separately ask about pywin32 after mandatory packages install",
+        "Should proceed to Phase 2 after successful installation"
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "I already have the dependencies installed. Let's set up folders.",
+      "expected_output": "Should verify dependencies by running the import check command. Should NOT skip verification and trust the user blindly. If all imports succeed, proceed to Phase 2.",
+      "files": [],
+      "expectations": [
+        "Should run the verification command: python -c \"import docx, openpyxl, pptx, xlrd, msoffcrypto, fitz; print('All dependencies OK')\"",
+        "Should NOT include win32com in the mandatory verification check",
+        "Should proceed to Phase 2 only after verification succeeds",
+        "Should tell user which package is missing if verification fails"
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "convert my documents to markdown please",
+      "expected_output": "Should check user memory for existing preferences at /memories/docs-to-markdown-preferences.md. If preferences exist, skip to Phase 4. If not, start from Phase 1.",
+      "files": [],
+      "expectations": [
+        "Should read /memories/docs-to-markdown-preferences.md first",
+        "Should skip to Phase 4 if preferences exist with valid folder paths",
+        "Should start from Phase 1 if no preferences file exists",
+        "Should NOT ask about folders or dependencies if already configured"
+      ]
+    },
+    {
+      "id": 6,
+      "prompt": "convert my documents to markdown. My source folder is empty.",
+      "expected_output": "Should detect the source folder is empty after checking preferences and listing files. Should tell the user to place files in the source folder. Should NOT run the conversion script on an empty folder.",
+      "files": [],
+      "expectations": [
+        "Should list the source folder contents",
+        "Should detect that the folder is empty",
+        "Should tell user to place files in the source folder and try again",
+        "Should NOT run the conversion script"
+      ]
+    },
+    {
+      "id": 7,
+      "prompt": "convert the files in my source folder to markdown. There are 5 files there.",
+      "expected_output": "Should offer a dry-run first before converting. Should ask the user whether they want to list the files first or convert directly. Should NOT immediately run conversion without offering the choice.",
+      "files": [],
+      "expectations": [
+        "Should offer dry-run option before converting",
+        "Should use vscode_askQuestions to ask dry-run vs direct convert",
+        "Should report the file count found",
+        "Should NOT start conversion without asking"
+      ]
+    },
+    {
+      "id": 8,
+      "prompt": "I have a scanned PDF with no text — just images of pages. Convert it to markdown.",
+      "expected_output": "Should attempt conversion via PyMuPDF. The script should detect no extractable text and report FAIL with a clear message about image-only PDFs. Should suggest OCR as a prerequisite.",
+      "files": ["evals/files/scanned-image-only.pdf"],
+      "expectations": [
+        "Should attempt conversion via PyMuPDF",
+        "Should report FAIL for the image-only PDF",
+        "Should explain that the PDF contains only images with no extractable text",
+        "Should suggest running OCR on the file first"
+      ]
+    },
+    {
+      "id": 9,
+      "prompt": "I'm on a Mac. Convert this IRM-protected Word document to markdown.",
+      "expected_output": "Should attempt Python-library conversion first, which will fail for IRM-protected files. Should then attempt COM fallback, which should fail with a clear platform error explaining that COM requires Windows with Office desktop. Should NOT show a generic or cryptic error.",
+      "files": ["evals/files/irm-protected.docx"],
+      "expectations": [
+        "Should attempt Python-library conversion first",
+        "Should fail and attempt COM fallback",
+        "Should produce a clear error: COM requires Windows with Microsoft Office desktop",
+        "Should explain that IRM-protected files cannot be converted on macOS/Linux",
+        "Should NOT show a cryptic ImportError or traceback"
+      ]
+    },
+    {
+      "id": 10,
+      "prompt": "Convert this legacy .doc file to markdown. I'm on Windows but I don't have pywin32 installed.",
+      "expected_output": "Should attempt Python-library conversion first, which will fail for .doc files. Should then attempt COM fallback, which should fail with a clear error about pywin32 not being installed, including the install command.",
+      "files": ["evals/files/legacy-format.doc"],
+      "expectations": [
+        "Should attempt Python-library conversion first",
+        "Should fail and attempt COM fallback",
+        "Should produce a clear error: pywin32 is not installed",
+        "Should include the install command: pip install pywin32",
+        "Should NOT show a generic ImportError"
+      ]
+    },
+    {
+      "id": 11,
+      "prompt": "Convert these 3 files to markdown: report.docx, data.xlsx, slides.pptx",
+      "expected_output": "Should convert all three files and report results. Each file should show OK/FAIL/SKIP status with file size. Should remind user that source files are untouched.",
+      "files": ["evals/files/report.docx", "evals/files/data.xlsx", "evals/files/slides.pptx"],
+      "expectations": [
+        "Should convert all 3 files",
+        "Should report OK/FAIL/SKIP status for each file",
+        "Should show file sizes in the results",
+        "Should remind user that original files are untouched",
+        "Should save output as .md files in the output folder"
+      ]
+    },
+    {
+      "id": 12,
+      "prompt": "Convert this PDF to markdown: proposal.pdf",
+      "expected_output": "Should convert the PDF using PyMuPDF. Should produce a clean Markdown file with extracted text and tables. Should report OK status with file size.",
+      "files": ["evals/files/proposal.pdf"],
+      "expectations": [
+        "Should use PyMuPDF (fitz) for PDF conversion",
+        "Should produce a .md file with extracted text",
+        "Should report OK status",
+        "Should NOT attempt COM fallback for PDF files"
+      ]
+    },
+    {
+      "id": 13,
+      "prompt": "set up the output folder for docs-to-markdown. Put it at custom-output/converted",
+      "expected_output": "Should accept the custom path and create the folder if it doesn't exist (after confirmation). Should save the path to user memory preferences.",
+      "files": [],
+      "expectations": [
+        "Should accept the custom folder path",
+        "Should ask for confirmation before creating the folder",
+        "Should save the output folder path to /memories/docs-to-markdown-preferences.md"
+      ]
+    },
+    {
+      "id": 14,
+      "prompt": "convert all files in my source folder. Skip the dry run, just convert them.",
+      "expected_output": "Should read preferences, list source folder, then run conversion directly without the dry-run step. Should run the convert_to_md.py script with the configured source and output folders. Should report results with OK/FAIL/SKIP per file.",
+      "files": [],
+      "expectations": [
+        "Should skip dry-run when user explicitly says so",
+        "Should run convert_to_md.py with correct source and output paths",
+        "Should report per-file results with status and size",
+        "Should remind user source files are untouched"
+      ]
+    },
+    {
+      "id": 15,
+      "prompt": "I have a mix of .docx, .xlsx, .pptx, .pdf, .doc, and .xls files. Convert them all to markdown. I'm on Windows with Office and pywin32 installed.",
+      "expected_output": "Should convert all files using the appropriate fallback chain for each type. Modern formats via Python libraries, legacy formats via COM. PDF via PyMuPDF. Should report status for each file.",
+      "files": [],
+      "expectations": [
+        "Should handle all 6 file types",
+        "Should use Python libraries for .docx, .xlsx, .pptx",
+        "Should use COM fallback for .doc and .xls if Python libraries fail",
+        "Should use PyMuPDF for .pdf",
+        "Should report per-file results"
+      ]
+    },
+    {
+      "id": 16,
+      "prompt": "Convert my files to markdown. Use 8 parallel workers for speed.",
+      "expected_output": "Should pass --workers 8 to the conversion script. Should run the conversion with the specified worker count.",
+      "files": [],
+      "expectations": [
+        "Should pass --workers 8 to convert_to_md.py",
+        "Should run conversion with the custom worker count"
+      ]
+    },
+    {
+      "id": 17,
+      "prompt": "just list what files would be converted — don't actually convert anything",
+      "expected_output": "Should run the conversion script with --dry-run flag. Should list files without converting them. Should NOT produce any .md output files.",
+      "files": [],
+      "expectations": [
+        "Should pass --dry-run flag to convert_to_md.py",
+        "Should list files with their types and sizes",
+        "Should NOT convert any files or create .md output"
+      ]
+    },
+    {
+      "id": 18,
+      "prompt": "One of my files failed with 'COM timed out'. What should I do?",
+      "expected_output": "Should reference the troubleshooting table and advise closing any open Office windows and retrying. Should explain that the script retries once automatically.",
+      "files": [],
+      "expectations": [
+        "Should identify this as a COM timeout issue",
+        "Should advise closing open Office windows",
+        "Should mention the script retries once automatically",
+        "Should offer to re-run the conversion"
+      ]
+    },
+    {
+      "id": 19,
+      "prompt": "convert my documents to markdown. I have a ~$report.docx lock file in the folder.",
+      "expected_output": "Should automatically skip the lock file and report it as SKIP. Should convert any other valid files in the folder. Should explain that lock files are skipped because the file is open in Office.",
+      "files": [],
+      "expectations": [
+        "Should skip the ~$report.docx lock file",
+        "Should report SKIP status for the lock file",
+        "Should convert other valid files normally",
+        "Should explain that lock files indicate the file is open in Office"
+      ]
+    },
+    {
+      "id": 20,
+      "prompt": "I need to convert files but one of the required tools is disabled. The vscode_askQuestions tool is not available.",
+      "expected_output": "Should detect that a required agent tool is unavailable and stop. Should tell the user which tool is missing and what it's needed for. Should NOT attempt to proceed without the tool.",
+      "files": [],
+      "expectations": [
+        "Should detect the missing required tool",
+        "Should name the specific tool that is unavailable",
+        "Should explain what the tool is needed for",
+        "Should NOT proceed with the workflow"
+      ]
+    }
+  ]
+}

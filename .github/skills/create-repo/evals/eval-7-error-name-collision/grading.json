@@ -1,0 +1,10 @@
+{
+  "eval_id": 7, "eval_name": "error-name-collision",
+  "expectations": [
+    {"text": "detects-collision", "passed": true, "evidence": "Check 6 runs gh repo view [OWNER]/[NAME]"},
+    {"text": "offers-alternatives", "passed": true, "evidence": "Check 6: 'Offer two options: (a) choose a different name, or (b) use the existing repo as the remote (switch to Path C)'"},
+    {"text": "does-not-overwrite", "passed": true, "evidence": "Halt rule prevents proceeding. Check 6 stops and asks user."},
+    {"text": "re-checks-new-name", "passed": true, "evidence": "Check 6: 'If the user picks a new name, re-run this check with the new name before proceeding.'"}
+  ],
+  "issues_found": []
+}

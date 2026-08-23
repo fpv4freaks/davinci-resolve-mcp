@@ -1,0 +1,129 @@
+# artefact.yaml — docs-to-markdown skill metadata
+# Powers catalog indexing and Agentic Skill Installer discovery.
+
+# --- IDENTITY (required) ---
+name: "docs-to-markdown"
+description: "Convert Office files (Word, Excel, PowerPoint) and PDF documents into clean Markdown. Handles modern OOXML, legacy binary, IRM/AIP-protected files, and PDF using Python libraries with Office COM fallback. USE WHEN user asks to convert .docx, .xlsx, .xls, .pptx, .ppt, .doc, .pdf files to Markdown, mentions 'convert to md', 'docs to markdown', 'office to markdown', 'extract content from Word/Excel/PowerPoint/PDF', 'convert PDF to markdown', 'pdf to md', or any intent to extract content from Office or PDF files into readable Markdown format. DO NOT USE FOR: creating Office files, editing existing Office files, mail merge, or image-only PDFs (scanned documents without OCR)."
+
+# --- OWNERSHIP (required) ---
+author: "Ibrahim El Sayed, Balázs Skorka"
+maintainers: ["@ibelsaye_microsoft", "@bskorka"]
+support: "ibelsaye@microsoft.com"
+
+# --- VERSION & LIFECYCLE (required) ---
+version: "2.0"
+created: 2026-04-15
+updated: 2026-04-23
+license: "MIT"
+status: production
+
+# --- CLASSIFICATION (required) ---
+type: skill
+category: productivity
+installer-group: productivity
+roles:
+  - all
+phases:
+  - all
+
+# --- METHODOLOGY MAPPING (recommended) ---
+methodologies:
+  - SureStep365
+
+surestep365:
+  phases:
+    - all
+  activities:
+    - code: "04-04"
+      name: "Review/identify requirements/user stories"
+    - code: "05-02"
+      name: "Functional analysis & design activity set"
+
+# --- COMPATIBILITY & PREREQUISITES (recommended) ---
+compatibility:
+  vs_code: ">=1.85"
+  copilot: "Agent mode required"
+prerequisites:
+  mcp_servers: []
+  cli_tools:
+    - name: "pandoc"
+      purpose: "Highest quality Word-to-Markdown conversion"
+      required: false
+      install: "winget install JohnMacFarlane.Pandoc"
+      verify: "pandoc --version"
+  python_packages:
+    - name: "python-docx"
+      purpose: "Read Word documents"
+      required: true
+      install: "pip install python-docx"
+    - name: "openpyxl"
+      purpose: "Read modern Excel files"
+      required: true
+      install: "pip install openpyxl"
+    - name: "python-pptx"
+      purpose: "Read PowerPoint presentations"
+      required: true
+      install: "pip install python-pptx"
+    - name: "xlrd"
+      purpose: "Read legacy Excel files"
+      required: true
+      install: "pip install xlrd"
+    - name: "pywin32"
+      purpose: "Office COM automation for IRM-protected and legacy binary files"
+      required: false
+      platform: windows
+      platform_note: "Requires Windows + Microsoft Office desktop. Not available on macOS/Linux."
+      install: "pip install pywin32"
+    - name: "msoffcrypto-tool"
+      purpose: "Detect IRM/encrypted Office files"
+      required: true
+      install: "pip install msoffcrypto-tool"
+    - name: "PyMuPDF"
+      purpose: "Read PDF files (text, tables, and structure)"
+      required: true
+      install: "pip install PyMuPDF"
+  npm_packages: []
+  extensions: []
+  environment: []
+
+# --- DOCUMENTATION (recommended) ---
+documentation: "https://github.com/mcaps-microsoft/ISDAIFirstAiBS/blob/main/.github/skills/docs-to-markdown/README.md"
+repo: "mcaps-microsoft/ISDAIFirstAiBS"
+project: ""
+
+# --- PRODUCT MAPPING (recommended) ---
+product-family:
+  - microsoft-365
+products:
+  - microsoft-365
+
+# --- TECHNOLOGIES & TAGS (optional) ---
+technologies:
+  - python
+  - microsoft-365
+  - github-copilot
+tags:
+  - office
+  - word
+  - excel
+  - powerpoint
+  - markdown
+  - converter
+  - docx
+  - xlsx
+  - pptx
+  - irm
+  - batch-convert
+  - document-extraction
+allowed-tools: ''
+distribution:
+  rapid-module:
+    enabled: false
+    namespace-safe: false
+    self-contained: false
+    mode: supporting
+    required-skills: []
+    conflicts-with: []
+    plane-access:
+      reads: []
+      writes: []

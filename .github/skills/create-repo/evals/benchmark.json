@@ -1,0 +1,28 @@
+{
+  "skill_name": "create-repo",
+  "skill_version": "1.1",
+  "iteration": 2,
+  "generated": "2026-04-10",
+  "note": "Re-run after fixing SKILL.md: added halt rule, collision handling with retry, reordered checks, explicit stop instructions, Path C skip-inputs, git push -u origin HEAD, sensitive file scan, .gitignore API fetch, cross-platform code blocks.",
+  "summary": {
+    "total_assertions": 38,
+    "passed": 38,
+    "failed": 0,
+    "pass_rate": 1.0,
+    "evals_run": 7
+  },
+  "evals": [
+    {"id": 1, "name": "path-a-happy-path", "assertions_total": 9, "assertions_passed": 9, "pass_rate": 1.0},
+    {"id": 2, "name": "path-a-all-inputs-provided", "assertions_total": 5, "assertions_passed": 5, "pass_rate": 1.0},
+    {"id": 3, "name": "path-b-existing-repo-with-changes", "assertions_total": 6, "assertions_passed": 6, "pass_rate": 1.0},
+    {"id": 4, "name": "path-b-clean-tree", "assertions_total": 4, "assertions_passed": 4, "pass_rate": 1.0},
+    {"id": 5, "name": "path-c-existing-remote", "assertions_total": 4, "assertions_passed": 4, "pass_rate": 1.0},
+    {"id": 6, "name": "error-gh-not-installed", "assertions_total": 4, "assertions_passed": 4, "pass_rate": 1.0},
+    {"id": 7, "name": "error-name-collision", "assertions_total": 4, "assertions_passed": 4, "pass_rate": 1.0}
+  ],
+  "coverage": {
+    "paths_tested": ["Path A (fresh)", "Path B (existing, changes)", "Path B (existing, clean)", "Path C (existing remote)"],
+    "error_paths_tested": ["gh CLI missing", "Name collision"],
+    "not_tested": ["gh auth failure (unauthenticated)", "git identity missing", "org owner resolution failure"]
+  }
+}
