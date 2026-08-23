@@ -1,0 +1,16 @@
+{
+  "eval_id": 1,
+  "eval_name": "path-a-happy-path",
+  "prompt": "/create-repo",
+  "assertions": [
+    {"name": "uses-vscode-askQuestions-or-inline", "description": "Uses vscode_askQuestions tool or inline questions"},
+    {"name": "gathers-owner", "description": "Resolves owner via gh api user or asks the user"},
+    {"name": "checks-git-identity", "description": "Checks git config user.name and user.email"},
+    {"name": "runs-all-preflight-checks", "description": "Runs all 6 preflight checks"},
+    {"name": "scans-for-sensitive-files", "description": "Warns about .env, secrets, keys, or large files"},
+    {"name": "fetches-gitignore-from-api", "description": "Uses gh api gitignore/templates/[LANGUAGE]"},
+    {"name": "correct-command-sequence", "description": "git init → git add → git commit → gh repo create [OWNER]/[NAME]"},
+    {"name": "uses-owner-in-repo-create", "description": "gh repo create includes [OWNER]/[NAME]"},
+    {"name": "provides-confirmation", "description": "Reports repo URL, branch, file count, visibility"}
+  ]
+}

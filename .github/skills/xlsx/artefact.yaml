@@ -1,0 +1,110 @@
+# artefact.yaml — Skill metadata for catalog indexing
+# All valid enum values are documented in:
+# .github/skills/skill-creator/references/mappings-reference.md
+
+# --- IDENTITY (required) ---
+name: "xlsx"
+description: "Create, edit, and analyze Excel (.xlsx, .xlsm, .csv, .tsv) spreadsheets. Build financial models with industry-standard formatting (blue inputs, black formulas, green cross-sheet links), use pandas for data analysis and openpyxl for formula/format preservation, and force-recalculate via LibreOffice to guarantee zero formula errors before delivery."
+
+# --- OWNERSHIP (required) ---
+author: "Anthropic (upstream); integrated by Pavel Koval"
+maintainers:
+  - "@pavelkoval_microsoft"
+  - "@dandreje_microsoft"
+  - "@dwojcik_microsoft"
+support: "@pavelkoval_microsoft"
+
+# --- VERSION & LIFECYCLE (required) ---
+version: "1.0"
+created: 2026-05-20
+updated: 2026-05-20
+license: "Proprietary (Anthropic) — see LICENSE.txt"
+status: production
+
+# --- CLASSIFICATION (required) ---
+type: skill
+category: productivity
+installer-group: productivity
+roles:
+  - all
+phases:
+  - all
+
+# --- METHODOLOGY MAPPING (recommended) ---
+methodologies:
+  - SureStep365
+
+surestep365:
+  phases:
+    - all
+  activities:
+    - code: "01-11"
+      name: "Create/refine the One Services Estimator (OSE)"
+    - code: "04-04"
+      name: "Review/identify requirements/user stories"
+    - code: "05-06"
+      name: "Data Migration mapping & script development"
+
+# --- COMPATIBILITY & PREREQUISITES (recommended) ---
+compatibility:
+  vs_code: ">=1.85"
+  copilot: "Agent mode required"
+prerequisites:
+  mcp_servers: []
+  cli_tools:
+    - name: "LibreOffice (soffice)"
+      purpose: "Recalculate formulas and scan for #REF!/#DIV/0!/#VALUE!/#NAME? errors"
+      required: true
+      install: "winget install TheDocumentFoundation.LibreOffice"
+      verify: "soffice --version"
+  python_packages:
+    - name: "pandas"
+      purpose: "Bulk data analysis, multi-sheet reads, CSV/TSV interop"
+      required: true
+      install: "pip install pandas"
+    - name: "openpyxl"
+      purpose: "Formula- and format-preserving writes to .xlsx"
+      required: true
+      install: "pip install openpyxl"
+  npm_packages: []
+  extensions: []
+  environment: []
+
+# --- DOCUMENTATION (recommended) ---
+documentation: "https://github.com/mcaps-microsoft/ISDAIFirstAiBS/blob/main/.github/skills/xlsx/README.md"
+repo: "mcaps-microsoft/ISDAIFirstAiBS"
+project: ""
+
+# --- PRODUCT MAPPING (recommended) ---
+product-family:
+  - cross-cutting
+products:
+  - pure-business
+
+# --- TECHNOLOGIES & TAGS (optional) ---
+technologies:
+  - python
+  - microsoft-365
+tags:
+  - excel
+  - xlsx
+  - csv
+  - tsv
+  - financial-model
+  - pandas
+  - openpyxl
+  - formulas
+  - data-cleaning
+  - data-migration
+allowed-tools: ""
+distribution:
+  rapid-module:
+    enabled: false
+    namespace-safe: false
+    self-contained: false
+    mode: supporting
+    required-skills: []
+    conflicts-with: []
+    plane-access:
+      reads: []
+      writes: []

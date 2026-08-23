@@ -1,0 +1,62 @@
+[
+  {
+    "query": "convert my Word document to Markdown. The file is report.docx",
+    "should_trigger": true
+  },
+  {
+    "query": "I have a PowerPoint presentation with a lot of content. Can you convert it to markdown so I can use it in my wiki?",
+    "should_trigger": true
+  },
+  {
+    "query": "convert an Excel spreadsheet to markdown tables. The file is data.xlsx",
+    "should_trigger": true
+  },
+  {
+    "query": "I need to extract text from a PDF file into markdown format. The file is proposal.pdf",
+    "should_trigger": true
+  },
+  {
+    "query": "convert all the docx files in my folder to markdown. They're in the documents folder",
+    "should_trigger": true
+  },
+  {
+    "query": "how do I convert an IRM-protected Word document to markdown?",
+    "should_trigger": true
+  },
+  {
+    "query": "I have an old .xls Excel file that's encrypted. Can you convert it to markdown?",
+    "should_trigger": true
+  },
+  {
+    "query": "batch convert my Office files to markdown. I have word docs, excel sheets, and PowerPoint presentations",
+    "should_trigger": true
+  },
+  {
+    "query": "convert presentation.pptx to markdown with all the slide content and speaker notes",
+    "should_trigger": true
+  },
+  {
+    "query": "turn my legacy .doc file into markdown",
+    "should_trigger": true
+  },
+  {
+    "query": "I need to create a new Word document with formatted text and tables",
+    "should_trigger": false
+  },
+  {
+    "query": "how do I edit an Excel file programmatically?",
+    "should_trigger": false
+  },
+  {
+    "query": "I want to merge multiple PDF files into one document",
+    "should_trigger": false
+  },
+  {
+    "query": "can you help me design a database schema?",
+    "should_trigger": false
+  },
+  {
+    "query": "extract images from a PDF file",
+    "should_trigger": false
+  }
+]

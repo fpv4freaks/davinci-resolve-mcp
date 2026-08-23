@@ -1,0 +1,131 @@
+# artefact.yaml — Skill/Agent/Tool metadata for catalog indexing
+# Place this file in the skill folder: .github/skills/<skill-name>/artefact.yaml
+# Regenerate master-artefacts.json locally after edits. The PR workflow validates
+# package conformance and rejects a stale catalog; it does not modify the branch.
+#
+# All valid enum values are documented in .github/skills/skill-creator/references/mappings-reference.md
+
+# --- IDENTITY (required) ---
+name: ""                               # Human-readable name (e.g., "meeting-scribe")
+description: ""                        # 1-2 sentences — what it does and when to use it
+
+# --- OWNERSHIP (required) ---
+author: ""                             # Full name of the primary author
+maintainers: []                        # Microsoft aliases (e.g., ["@dwojcik_microsoft"])
+support: ""                            # Contact email for support
+
+# --- VERSION & LIFECYCLE (required) ---
+version: "0.1"                         # Semantic version
+created: 2026-01-01                    # Date first created (YYYY-MM-DD)
+updated: 2026-01-01                    # Date last updated (YYYY-MM-DD)
+license: "MIT"                         # License type
+status: draft                          # draft | beta | production | deprecated
+
+# --- CLASSIFICATION (required) ---
+type: skill                            # mcp-server | agent | skill | prompts | tool | documentation | starter-kit
+category: functional                   # functional | technical | testing | governance | productivity
+installer-group: productivity          # presales | methodology-manager | governance | delivery | productivity
+roles:                                 # AiBS audience roles; canonical RAPID task owners are derived from RAPID
+  - all                                # solution-architect | technical-architect | data-architect | security-architect | engagement-lead | program-director | project-manager | customer-project-manager | functional-consultant | technical-consultant | business-analyst | ux-designer | ai-engineer | platform-engineer | devops-lead | release-manager | service-operations-lead | hypercare-lead | security-engineer | test-lead | all
+phases:                                # Which delivery phases — pick one or more
+  - all                                # presales | planning | build | delivery | operations | all
+
+# --- METHODOLOGY MAPPING (recommended) ---
+methodologies:                         # Which methodologies this applies to
+  - SureStep365                        # SureStep365 | all; RAPID uses distribution.rapid-module
+
+surestep365:
+  phases:                              # SureStep365 phases — pick one or more
+    - all                              # presales-discovery | mobilize-delivery | initiate | solution-modelling | config-dev-sprints | solution-testing | prepare-deploy | operate | monitor-optimise | all
+  activities: []                       # SureStep365 activities — {code, name} objects; {code: all} = every activity. E.g.:
+  #   - code: "05-04"
+  #     name: "Configuration & Development activity set"
+  #   - code: "05-09"
+  #     name: "CI/CD Release Management"
+
+# --- RAPID MODULE ASSESSMENT (required; distribution is explicit opt-in) ---
+# Every skill records an assessment block. Leave enabled false unless the owner approves mirroring.
+# Omit mapping when the skill is not a RAPID module member. Enabling distribution is an owner
+# assertion; the RAPID installer still validates lifecycle, licence, namespace safety, dependencies,
+# and canonical mappings before installation.
+distribution:
+  rapid-module:
+    enabled: false                       # Explicit owner approval for RAPID to mirror this skill
+    # mapping:                           # Add only when the skill belongs to the RAPID module
+    #   phases:                          # Canonical phase folder slugs from mcaps-microsoft/RAPID
+    #     - 02-delivery-loops
+    #   streams:                         # Canonical stream folder slugs; [] is valid for unstreamed scope
+    #     - solution
+    #   tasks:                           # Optional exact canonical task filename stems; [] means no task claim
+    #     - run-process-testing
+    namespace-safe: false                # Works below a namespaced root such as .github/skills/AIBS/<name>
+    self-contained: false                # Runtime files are in this skill or named in required-skills
+    mode: supporting                     # standalone | supporting | substitute (ignored when disabled)
+    required-skills: []                  # AiBS skill folder names installed as one dependency closure
+    conflicts-with: []                   # Skill folder names that must not coexist in the target repo
+    plane-access:                        # RAPID project planes this skill directly reads or writes
+      reads: []                          # raw | context | state | artefacts
+      writes: []                         # raw is never a valid write target
+
+# --- COMPATIBILITY & PREREQUISITES (required; use empty arrays when none) ---
+compatibility:
+  vs_code: ">=1.85"                    # Minimum VS Code version
+  copilot: "Agent mode required"       # Copilot requirement
+prerequisites:
+  mcp_servers: []                      # MCP servers needed by the skill
+  #   - name: "WorkIQ MCP Server"
+  #     purpose: "Access meeting transcripts via Microsoft Graph"
+  #     required: true                 # true = skill cannot function without it
+  #     install: "npm install -g @anthropic-ai/workiq-mcp"
+  cli_tools: []                        # Command-line tools the skill invokes
+  #   - name: "GitHub CLI (gh)"
+  #     purpose: "Read/write GitHub Issues, create PRs, manage repos"
+  #     required: true
+  #     install: "winget install GitHub.cli"
+  #     verify: "gh --version"         # Command to verify installation
+  #   - name: "Git"
+  #     purpose: "Version control operations"
+  #     required: true
+  #     install: "winget install Git.Git"
+  #     verify: "git --version"
+  python_packages: []                  # Python packages (pip install)
+  #   - name: "python-docx"
+  #     purpose: "Word document conversion"
+  #     required: false
+  #     install: "pip install python-docx"
+  npm_packages: []                     # Node.js / npm packages (npm install)
+  #   - name: "@anthropic-ai/workiq-mcp"
+  #     purpose: "WorkIQ MCP server runtime"
+  #     required: true
+  #     install: "npm install -g @anthropic-ai/workiq-mcp"
+  #     verify: "npm list -g @anthropic-ai/workiq-mcp"
+  extensions: []                       # VS Code extensions
+  #   - name: "ms-playwright.playwright"
+  #     purpose: "Browser automation for D365 screenshot capture"
+  #     required: false
+  environment: []                      # Runtime environments / IDEs / platforms (not one-command installs)
+  #   - name: "Unified Development Environment (UDE)"
+  #     purpose: "D365 F&O development host"
+  #     required: true
+  #     setup: "https://learn.microsoft.com/dynamics365/fin-ops-core/dev-itpro/..."
+
+# --- DOCUMENTATION (required; empty strings are valid when not applicable) ---
+documentation: ""                      # URL to README.md on GitHub
+repo: ""                               # GitHub org/repo (e.g., "mcaps-microsoft/ISDAIFirstAiBS")
+project: ""                            # Project name — empty = "Generic / Reusable"
+
+# --- PRODUCT MAPPING (required; use empty arrays when product-agnostic) ---
+# Two-level Microsoft product taxonomy. Level 1 (product-family) rolls up for filters;
+# Level 2 (products) is the specific surface the skill acts on. Each Level 2 value
+# belongs to exactly one family. Both accept the `all` wildcard. This vocabulary is
+# curated and separate from the free-form `technologies` field below.
+# Full per-family value lists: mappings-reference.md → Product Mapping.
+product-family: []                     # Level 1 — pick one or more; leave [] if product-agnostic
+  # - d365-finance-operations          # d365-finance-operations | d365-business-central | power-platform | microsoft-365 | ai-and-agents | data-and-analytics | azure | azure-devops | github | security-and-identity | cross-cutting | all
+products: []                           # Level 2 — pick one or more; leave [] if product-agnostic
+  # - d365-fo                          # Specific surface(s) within the family — see mappings-reference.md
+
+# --- TECHNOLOGIES & TAGS (required arrays; may be empty) ---
+technologies: []                       # e.g., [microsoft-teams, github-copilot, python]
+tags: []                               # Free-form tags for search (e.g., [meetings, recordings, weekly-report])
+allowed-tools: ""                      # Optional: restrict tool access (e.g., "Bash(python:*) WebFetch")
