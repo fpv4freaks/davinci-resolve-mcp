@@ -68,13 +68,23 @@ def _process_lines() -> Optional[List[str]]:
         if platform.system().lower() == "windows":
             # `tasklist` prints no command line, so the flag is invisible there.
             # WMIC does print it and is what makes headless detection possible.
+            #
+            # Decoded explicitly: `text=True` alone decodes with the locale
+            # codepage, which raises UnicodeDecodeError on a byte cp1252 has no
+            # mapping for — and this read is the input to the second-instance
+            # guard, so it must fail to "cannot tell", never to an exception.
+            # ASCII is byte-identical under both codecs, so the matching this
+            # feeds is unchanged; what WMIC emits for a non-ASCII install path
+            # on a non-English Windows is not something we can verify here.
             out = subprocess.run(
                 ["wmic", "process", "where", "name='Resolve.exe'", "get", "CommandLine"],
-                capture_output=True, text=True, timeout=10, check=False,
+                capture_output=True, text=True, encoding="utf-8", errors="replace",
+                timeout=10, check=False,
             )
         else:
             out = subprocess.run(
-                ["ps", "-Ao", "command="], capture_output=True, text=True, timeout=10, check=False
+                ["ps", "-Ao", "command="], capture_output=True, text=True,
+                encoding="utf-8", errors="replace", timeout=10, check=False,
             )
         if out.returncode != 0 and not out.stdout:
             return None
@@ -83,8 +93,13 @@ def _process_lines() -> Optional[List[str]]:
         return None
 
 
+def _matches_pattern(executable: str) -> bool:
+    """Does this bare executable path name a Resolve application?"""
+    return any(executable.endswith(pattern) for pattern in RESOLVE_PROCESS_PATTERNS)
+
+
 def _is_resolve_command(line: str) -> bool:
-    """Is this command line a Resolve *executable*, not merely a mention of one?
+    r"""Is this command line a Resolve *executable*, not merely a mention of one?
 
     A plain substring test matches any process whose command line happens to
     contain the path — including a shell running a script that references it.
@@ -96,8 +111,32 @@ def _is_resolve_command(line: str) -> bool:
     flags. So strip trailing flag tokens and require what remains to *end* with
     the pattern. That survives the spaces in "DaVinci Resolve.app" (no splitting
     on whitespace) while rejecting a path buried mid-command.
+
+    Windows quotes that path. WMIC prints the executable wrapped in double
+    quotes whenever it contains spaces, which the default install path always
+    does (`"C:\Program Files\Blackmagic Design\DaVinci Resolve\Resolve.exe"`),
+    so the line ends in `"` and `endswith("Resolve.exe")` was false on every
+    stock Windows machine — `runtime_mode` reported nothing running while the
+    same server was driving that very instance, and the second-instance guard
+    in `get_resolve()` lost its input. Reported in #150. A leading quote means
+    the executable is exactly what sits inside the first quoted span; anything
+    after the closing quote is arguments, and the flag loop never sees it.
+    """
+    return _matches_pattern(_executable_from_line(line))
+
+
+def _executable_from_line(line: str) -> str:
+    """The executable path from a command line, with argument tokens removed.
+
+    Split out of `_is_resolve_command` so the install-location lookup below
+    agrees with the "is this Resolve" test about where the path ends. See that
+    function's docstring for why the quoting and flag-stripping rules are these.
     """
     text = line.strip()
+    if text.startswith('"'):
+        close = text.find('"', 1)
+        if close > 1:
+            return text[1:close]
     while True:
         stripped = text.rstrip()
         cut = stripped.rfind(" -")
@@ -109,7 +148,7 @@ def _is_resolve_command(line: str) -> bool:
         if not candidate:
             break
         text = candidate
-    return any(text.endswith(pattern) for pattern in RESOLVE_PROCESS_PATTERNS)
+    return text
 
 
 def resolve_processes() -> Optional[List[str]]:
@@ -118,6 +157,52 @@ def resolve_processes() -> Optional[List[str]]:
     if lines is None:
         return None
     return [line for line in lines if _is_resolve_command(line)]
+
+
+#: Where the scripting library sits relative to the Resolve executable. The
+#: library ships *inside* the application, so the running executable's own path
+#: is the only locator that is right by construction — every hardcoded install
+#: root is a guess about where the user chose to put Resolve.
+_LIB_RELATIVE_TO_EXECUTABLE = {
+    "windows": ("fusionscript.dll",),
+    "darwin": ("../Libraries/Fusion/fusionscript.so",),
+    "linux": (
+        "../libs/Fusion/fusionscript.so",
+        "../libs/fusionscript.so",
+        "fusionscript.so",
+    ),
+}
+
+
+def running_resolve_lib() -> Optional[str]:
+    """Scripting library of the *running* Resolve, or None.
+
+    Blackmagic's own `DaVinciResolveScript.py` falls back to one hardcoded
+    install path per platform, and this project's defaults mirror it. A Resolve
+    installed anywhere else — a second drive, an external volume, a custom
+    directory — is therefore invisible to both, and the failure is silent: the
+    module imports, the DLL behind it does not load, and the user is told the
+    edition or the preference is at fault.
+
+    The running process settles it without guessing. Returns None when nothing
+    is running, the process list is unavailable, or the derived path does not
+    exist; callers keep their existing defaults in that case.
+    """
+    processes = resolve_processes()
+    if not processes:
+        return None
+    suffixes = _LIB_RELATIVE_TO_EXECUTABLE.get(platform.system().lower(), ())
+    for line in processes:
+        executable_dir = os.path.dirname(_executable_from_line(line))
+        if not executable_dir:
+            continue
+        for suffix in suffixes:
+            candidate = os.path.normpath(
+                os.path.join(executable_dir, *suffix.split("/"))
+            )
+            if os.path.isfile(candidate):
+                return candidate
+    return None
 
 
 def runtime_mode() -> Dict[str, Any]:

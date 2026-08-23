@@ -138,6 +138,39 @@ def test_npm_package_metadata():
     assert (PROJECT_ROOT / "bin" / "davinci-resolve-mcp.mjs").exists()
 
 
+def test_package_lock_in_sync():
+    """package-lock.json must track package.json — version AND dependencies.
+
+    `npm ci` refuses to install at all when the two disagree ("Missing: X from
+    lock file"), so a stale lock breaks every reproducible install — CI, a
+    fresh contributor clone, a container build — while `npm install` and
+    `npm publish` stay green and hide it. That is exactly how this drifted
+    seven releases: the version fell behind at 2.90.0, and two
+    optionalDependencies (js-yaml, pg) were added without ever being locked.
+
+    Regenerate with `npm install --package-lock-only`, and commit the result.
+    """
+    package = json.loads((PROJECT_ROOT / "package.json").read_text())
+    lock = json.loads((PROJECT_ROOT / "package-lock.json").read_text())
+    root = lock["packages"][""]
+
+    assert lock["version"] == package["version"], (
+        f"package-lock.json version {lock['version']!r} != package.json "
+        f"{package['version']!r} — run: npm install --package-lock-only"
+    )
+    assert root["version"] == package["version"], (
+        f"package-lock.json packages[''] version {root['version']!r} != "
+        f"package.json {package['version']!r} — run: npm install --package-lock-only"
+    )
+
+    # The block that actually decides whether `npm ci` runs.
+    for block in ("dependencies", "devDependencies", "optionalDependencies"):
+        assert package.get(block, {}) == root.get(block, {}), (
+            f"package.json {block} != package-lock.json packages[''] {block} — "
+            f"npm ci will fail with EUSAGE. Run: npm install --package-lock-only"
+        )
+
+
 def test_utils_syntax():
     utils_dir = PROJECT_ROOT / "src" / "utils"
     for py_file in utils_dir.glob("*.py"):
@@ -145,8 +178,8 @@ def test_utils_syntax():
 
 
 def test_compound_tool_count():
-    # 34 = 33 baseline + edit_engine (Phase E).
-    assert _count_mcp_tools(PROJECT_ROOT / "src" / "server.py") == 34
+    # 35 = 33 baseline + edit_engine (Phase E) + timeline_frame (#146).
+    assert _count_mcp_tools(PROJECT_ROOT / "src" / "server.py") == 36
 
 
 def test_prompt_registrations():
@@ -184,7 +217,7 @@ def test_prompt_registrations():
 
 def test_granular_tool_count():
     total = sum(_count_mcp_tools(py_file) for py_file in GRANULAR_DIR.glob("*.py"))
-    assert total == 341
+    assert total == 353
 
 
 def test_reported_granular_tools_have_explicit_annotations():

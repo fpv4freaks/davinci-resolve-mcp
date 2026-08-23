@@ -23,16 +23,24 @@ take up to 60 seconds.
 edition `scriptapp("Resolve")` refuses a foreign process regardless. A third
 transport reaches it — a script run from **Workspace ▸ Scripts** is handed the
 live `resolve` object on any edition and re-exports it over an authenticated
-loopback listener. Install with `python scripts/install_resolve_bridge.py`, start
-it from that menu, and set `DAVINCI_RESOLVE_BRIDGE=1`. Existing tool call sites
-work unchanged. Two things to know when diagnosing it:
+loopback listener. Install with `python scripts/install_resolve_bridge.py` and
+start it from that menu; once running it is used automatically when external
+scripting is unavailable, with no environment variable needed.
+`DAVINCI_RESOLVE_BRIDGE=1` *forces* it — the bridge becomes the only transport
+tried, so its faults surface directly instead of degrading to another path.
+Existing tool call sites work unchanged. Two things to know when diagnosing it:
 
-- On macOS, Resolve lists `.py` scripts only when it can find a **framework
-  Python** (python.org). Homebrew/pyenv/conda are not detected and the script
-  simply never appears, with no error. The installer preflights this and ships a
-  Lua canary, which always lists, so "Python not detected" is distinguishable
-  from "wrong folder". The preflight is macOS-only — off macOS Resolve finds
-  Python by other means, and running the check there was a false alarm (#106).
+- On macOS, Resolve finds Python 3 through **`PYTHON3HOME`, then
+  `/usr/local/bin/python3`** — and nowhere else, so Homebrew/pyenv/uv/conda
+  interpreters simply never appear, with no error. python.org installs work
+  because that installer creates `/usr/local/bin/python3`; framework-ness itself
+  is not the variable (#143). The sudo-free fix is
+  `launchctl setenv PYTHON3HOME "$(python3 -c 'import sys; print(sys.prefix)')"`
+  — `launchctl`, not `export`, because Resolve is GUI-launched and inherits
+  launchd's environment. The installer preflights both routes and ships a Lua
+  canary, which always lists, so "Python not detected" is distinguishable from
+  "wrong folder". The preflight is macOS-only — off macOS Resolve finds Python
+  by other means, and running the check there was a false alarm (#106).
 - **Windows: both script folders confirmed.** `%PROGRAMDATA%` (#109) and
   `%APPDATA%` (#112) have each been shown serving the bridge on Windows 11 free
   builds. If a user reports the menu entry missing on Windows, ask whether the
@@ -154,8 +162,8 @@ before mutating Resolve state.
 
 | Mode | Entry point | Tool count | Use when |
 |---|---|---|---|
-| Compound (default) | `src/server.py` | 34 tools | Most workflows — keeps context lean |
-| Granular (full) | `src/server.py --full` | 341 tools | Power users needing one tool per API method |
+| Compound (default) | `src/server.py` | 36 tools | Most workflows — keeps context lean |
+| Granular (full) | `src/server.py --full` | 353 tools | Power users needing one tool per API method |
 
 This skill document covers the **compound server** (the default). Each compound
 tool accepts an `action` string and an optional `params` object.
@@ -319,7 +327,10 @@ venv/bin/python -m src.control_panel
 
 The command starts the local control panel and opens the default browser. Use
 `--no-open` when running in a headless context, then give the user the printed
-localhost URL. The panel is local and single-user; it is an operational surface
+localhost URL **exactly as printed** — it carries a per-launch bearer token in
+its fragment (`#token=…`) and the panel refuses every request without it. The
+panel binds loopback only (a non-loopback host is refused, no override) and is
+single-user; it is an operational surface
 for server status, Resolve clips, source-safe analysis jobs, preferences, and
 diagnostics as those sections are added.
 
@@ -385,7 +396,7 @@ the work done:
 
 - `timeline(action="detect_gaps_overlaps")`
 - `timeline(action="source_range_report")`
-- `timeline_markers(action="get_thumbnail_image")` at important markers and cuts
+- `timeline_frame(action="capture")` at important markers and cuts
 - Compare each marker name against the Resolve-rendered frame; revise the marker
   or edit if the image contradicts the plan.
 
@@ -433,7 +444,11 @@ same timecodes, then restore the previous active version or node-enabled state
 after any temporary bypass capture. Treat untreated frames as diagnostic
 evidence, not as permission to discard an existing creative grade.
 
-Prefer `safe_set_cdl` for small reversible primary corrections. Use DRX/stills
+Prefer `safe_set_cdl` for small reversible primary corrections. `SetCDL`'s
+`NodeIndex` is 1-BASED (scripting README line 6) and there is no `GetCDL`
+readback — `safe_set_cdl` and `apply_look_to_items` now read the node graph's
+`GetNumNodes` first and return a structured reason/diagnosis on a false
+`SetCDL` instead of a bare boolean. Use DRX/stills
 or grade copy only when the user accepts whole-grade replacement/transfer
 semantics. Use DCTL/LUT authoring only for reusable mathematical transforms, not
 as a substitute for hand-built windows, qualifiers, or tracked secondaries. Do
@@ -479,6 +494,32 @@ you are on the correct page first.
 
 ## Tool Map
 
+### Craft Guidance
+
+**`knowledge`** — The editorial, colour, audio, and workflow guidance bundled with
+this server, served as prose. No Resolve connection required.
+
+Read a topic **before** a creative or destructive operation, not after. The tools will
+happily execute an editorially wrong decision; this is where the reasoning lives —
+measured numbers, known traps, and what each move costs to undo.
+
+Key actions:
+- `topics(category?)` — the index: topic id, one-line summary, size, sections, and
+  related topics. Categories: `workflow` (task playbooks: tighten a recording, build a
+  rough cut, match a grade), `guide`, `kernel` (per-surface tool maps), `reference`
+  (exhaustive ledgers including this document), `repo` (contributing here)
+- `get(topic, section?, inline?)` — the resolved prose. Natural aliases work
+  (`"tighten"`, `"dead air"`, `"grading"`, `"conform"`). Referenced guides and kernels
+  arrive inlined, so a client with no checkout of this repository still gets the
+  manual, not a path to it. `section` returns one heading's subtree
+- `search(query, limit?)` — ranked topics with excerpts
+- `capabilities()` — topic count by category, and the corpus directories
+
+The same index is published as the `knowledge://topics` MCP resource, so hosts that
+consume resources can see what guidance exists without spending a turn.
+
+---
+
 ### App Control
 
 **`resolve_control`** — App-level operations.
@@ -486,7 +527,16 @@ you are on the correct page first.
 Key actions:
 - `launch` — connect to or start Resolve; call this first if any tool returns a
   "Not connected" error
-- `get_version` — returns `{product, version, version_string}`
+- `get_version` — returns `{product, version, version_string, build, mcp}`.
+  `build.unavailable_on_this_build` lists every recorded API surface this build
+  does **not** have; read it before offering anything version-gated. An absence
+  from that list is not a promise a method exists — most of the API has never
+  been version-bisected, so `check_version_support` answers `unknown` for it,
+  and `unknown` means probe with `name in dir(obj)`, never bare `hasattr`
+  (constant `True` on Resolve objects)
+- `check_version_support(symbol?, resolve_version?)` — is one named symbol on
+  this build? Without `symbol`, the same missing-surface list `get_version`
+  carries. No connection needed when `resolve_version` is passed
 - `api_truth(query?)` — look up behaviorally-verified facts about quirky/unreliable
   Resolve API behavior (no connection needed); filter by substring
 - `verification_stats` — readback-verification tally (verified/contradicted/
@@ -495,11 +545,35 @@ Key actions:
 - `get_keyframe_mode` / `set_keyframe_mode(mode)`
 - `get_fairlight_presets` — Resolve 20.2.2+; returns available Fairlight
   preset names
+- `list/save/load/delete/import/export_user_preferences_preset` — Resolve
+  21.0.4+; user-preferences presets. `load_...` is SESSION-WIDE: it swaps the
+  user's global Resolve preferences, so only call it when the user asked for
+  the switch. `import_...` does not activate the imported preset — follow with
+  `load_user_preferences_preset`
 - `quit` — terminates Resolve (destructive; confirm with user first)
 
+**Offline timeline authoring on `timeline`** — served above the connection check:
+`author_offline` writes an importable `.drt` / `.otio` / `.edl` from a clip plan when
+Resolve is unreachable, and `offline_fallback_capabilities` reports whether it can. Every
+not-connected error carries an `offline_alternative` block naming it. Authoring a file
+does not complete a failed live operation — the timeline is not in a project until it is
+imported. See `docs/kernels/timeline-conform-interchange-kernel.md`.
+
+**Offline audio and image QC on `media_analysis`** — no Resolve connection required:
+`measure_loudness`, `mix_plan` / `mix_plan_capabilities` (dialogue-anchored rough mix
+with dialogue-following ducking, rendered and re-measured), and `assess_grade` /
+`grade_loop` / `grade_loop_capabilities` (numeric grade-damage QC and the retry ladder
+that backs a look off until it stops damaging the picture). See
+`docs/kernels/audio-fairlight-kernel.md` and `docs/kernels/color-grade-kernel.md`.
+
 **`layout_presets`** — Save, load, export, import, delete UI layout presets.
+`list` (Resolve 21.0.4+) enumerates the saved preset names the other actions
+take.
 
 **`render_presets`** — Import and export render and burn-in presets.
+`list_burnin` / `delete_burnin` (Resolve 21.0.4+) enumerate and remove burn-in
+presets — `list_burnin` is the only way to discover the names the `DataBurnIn`
+render setting and the `load_burnin_preset` actions expect.
 
 ---
 
@@ -507,10 +581,15 @@ Key actions:
 
 **`project_manager`** — CRUD on projects.
 
-Key actions: `list`, `get_current`, `create(name, media_location_path?)`,
+Key actions: `list`, `list_attributes`, `get_current`,
+`create(name, media_location_path?)`,
 `load(name)`, `save`, `close`,
 `delete(name)`, `import_project(path)`, `export_project(name, path)`, `archive`,
 `restore`
+
+`list_attributes` (Resolve 21.0.4+) returns `lastModifiedDate`, `creationDate`,
+`notes`, and `liveCollaborationMode` per project in the current folder without
+loading any of them.
 
 Project / Database / Archive kernel actions (v2.15.0+) add guarded project
 lifecycle, settings, database, preset, and archive boundary helpers:
@@ -617,9 +696,25 @@ switching, and flattening remain Resolve UI workflows; see
 Note: `folder path` arguments use slash notation like `"Master/SubFolder"`.
 `"Master"` or `"/"` refers to the root folder.
 
+Address a folder either by `path` or by `folder_id` — the id `get_subfolders`
+returns for each entry (v2.77.0+; the same pair works for `media_pool
+add_subfolder` via `parent_path`/`folder_id` and for `media_pool
+get_timeline_mattes` via `folder_path`/`folder_id`). Omit both to get the
+action's default: the current folder for the `folder` tool, the root folder for
+those two `media_pool` actions. An address that is supplied but does not resolve
+is a `FOLDER_NOT_FOUND` / `invalid_input` error — it never quietly falls back to
+the current bin.
+
+That fallback is what these tools used to do, so treat a pre-v2.77.0 server as
+unable to tell you when it answered about the wrong folder. Note also that only
+`path`/`folder_path`/`folderPath` and `folder_id`/`folderId` are recognised as
+addresses: any other key you invent (`id`, `bin`, `folderName`) is still
+silently dropped, and the action still answers about its default folder with
+`success`. Use the documented names.
+
 **`folder`** — Operations on a specific Media Pool folder.
 
-Key actions: `get_clips(path?)`, `get_subfolders(path?)`, `export(path?, export_path)`,
+Key actions: `get_clips(path?|folder_id?)`, `get_subfolders(path?|folder_id?)`, `export(path?, export_path)`,
 `transcribe_audio(path?, use_speaker_detection?)`, `clear_transcription(path?)`,
 `perform_audio_classification(path?)`, `analyze_for_intellisearch(path?, identify_faces?, is_better_mode?)`,
 `analyze_for_slate(path?, marker_color?)`, `remove_motion_blur(path?, deblur_option?)` (Resolve 21+;
@@ -1307,7 +1402,12 @@ Key actions:
   instead of walking tracks by hand. Filters may be passed inline or as a
   `filters` dict; a mistyped filter name is rejected rather than silently
   matching everything. Returns `{clips, match_count, total_clips}`.
-- `delete_clips(clip_ids, ripple?)` — IDs are unique IDs from `get_items`
+- `delete_clips(clip_ids, ripple?)` — IDs are unique IDs from `get_items`.
+  Two verified quirks (see `api_truth`): the call can return `success: false`
+  on the first attempt with valid IDs — re-list and retry once before failing;
+  and deleting a video item does NOT delete its linked audio — pass the linked
+  audio item IDs explicitly, then `detect_gaps_overlaps` across both track
+  types.
 - `duplicate_clips(clip_ids?, selected?, target_track_index?, track_offset?, placement?, record_frame?, record_frame_offset?, copy_properties?, include_linked?)` —
   duplicate existing video timeline items by re-appending the same Media Pool
   item with the same source trim; `selected=True` uses Resolve's selected/current
@@ -1321,7 +1421,20 @@ Key actions:
   unsupported because Resolve's public scripting API does not expose transition
   cloning. `copy_keyframes=True` adds the `keyframes` group.
 - `copy_clips(...)` / `move_clips(...)` — same safe append path; `move_clips`
-  deletes successfully duplicated source items afterward
+  deletes only sources whose duplicate was VERIFIED live on the timeline
+  (AppendToTimeline can return null-id items — e.g. into an occupied span — and
+  unverified sources are kept with a warning; see api_truth
+  'AppendToTimeline null-id'). NEVER use `move_clips` to open a gap for an
+  insert; that is `ripple_insert`'s job.
+- `ripple_insert(clip_infos, record_frame|record_timecode, record_frame_mode?,
+  dry_run?, confirm_token?)` — insert media-pool source ranges at a record point
+  and shift ALL later video/audio items right. DRY-RUN by default (full plan
+  with straddler/blocker detection); executing is confirm-token gated and
+  archives the timeline first. Shifted items are re-created from pool media
+  with transform/crop/composite/retime re-applied; grades, keyframes,
+  transitions, and link state on shifted items are NOT preserved (the archive
+  keeps them). Refuses mid-item insert points, non-pool items in the tail
+  (titles/generators/Fusion comps), subtitle shifts, and locked tracks.
 - `copy_range` / `duplicate_range` — copy exact video/audio source segments
   from `start_frame`/`end_frame` or mark in/out to `record_frame`
 - `overwrite_range` — delete whole destination overlaps, then copy the exact
@@ -1333,13 +1446,29 @@ Key actions:
   into an editor-facing beat report
 - `create_variant_from_ranges(name, ranges, markers?, cdl?, dry_run?)` — create
   a guarded timeline variant from declarative source ranges, optional markers,
-  transforms, and CDL
+  transforms, and CDL. Each range takes `track_type?` and a 1-based
+  `track_index?` (default 1), so multicam angles can be rebuilt onto V2/V3
+  rather than collapsing onto V1; missing tracks are added
 - `bulk_set_item_properties(ops, dry_run?, readback?)` — apply transforms,
-  crop/composite/audio/property groups to many timeline items in one call
+  crop/composite/audio/property groups to many timeline items in one call. An op
+  may carry `clip_color` and/or `enabled` with nothing else, which is the triage
+  shape: paint a whole selection in one round trip. A colour is verified by
+  readback, so a name outside the Edit-page palette and the generator/title case
+  that returns True and drops the colour both fail the op instead of passing
 - `apply_look_to_items(target_ids, cdl?|copy_from_item_id?, dry_run?)` — apply a
   normalized CDL and/or copy a source grade to multiple video items
-- `thumbnail_contact_sheet` / `marker_thumbnail_review` — sample Resolve-rendered
-  thumbnails under the project analysis root for visual verification
+- `thumbnail_contact_sheet` / `marker_thumbnail_review` — sample Resolve
+  thumbnails under the project analysis root. These are CLIP thumbnails, so the
+  sheet is effectively one image per clip, not per sampled frame — a shot
+  inventory rather than frame evidence. Resolve only serves them on the Color
+  page and only while it is frontmost; the tool switches page automatically and
+  restores the previous one. Expect a page flash in the GUI,
+  and note that landing on Color can kick off cache/render work for the current
+  clip — on a large timeline the switch is not free.
+  NOT WYSIWYG for Fusion: thumbnails do not reflect Fusion composition output
+  (a warp demo read as identical before/after from a contact sheet,
+  2026-08-19). Prove Fusion/grade claims with `gallery_stills grab_and_export`
+  or an extracted RENDERED frame, never a thumbnail
 - `edit_kernel_capabilities` — report supported, partially supported, and
   unsupported timeline edit kernel behavior
 - `probe_edit_kernel_item(clip_ids? selected? timeline_item?)` — read-only
@@ -1427,13 +1556,57 @@ The compound tool accepts `frame`, `frame_id`, and `frameId` aliases.
 
 Note: `get_thumbnail` returns raw pixel data from `GetCurrentClipThumbnailImage()`.
 The dictionary includes `data` (raw bytes as a Python bytes-like object),
-`format`, `width`, `height`, `noOfComponents`, and `depth`. This reflects the
-current frame as rendered by Resolve — including any color grading or effects
-applied — which is different from reading the source file directly.
+`format`, `width`, `height`, `noOfComponents`, and `depth`. This reflects Resolve's processed
+output — including color grading and effects — rather than the source file. It
+is the CLIP's thumbnail, though: every frame of a clip returns the same image, so
+it cannot verify a specific frame. Use `timeline_frame(action="capture")` for
+that.
 
 Use `get_thumbnail_image` when the MCP client can display image content directly.
 It converts the same Resolve thumbnail payload to PNG bytes without writing a
-file to disk.
+file to disk. Both actions hold the Color page for the read, restore the
+previous page, and poll rather than trusting a single read; both still need
+Resolve to be the frontmost application. Prefer `timeline_frame(action="capture")`
+for new work — it renders the frame you actually asked for.
+
+**`timeline_frame`** — Capture a timeline frame as viewable image content.
+
+Key actions: `capture(timecode?|frame?, quality?, max_width?, format?, timeline_name?)`,
+`capabilities`
+
+Returns MCP image content, so a multimodal assistant can look at what Resolve is
+rendering — grade, Fusion, titles, transitions — rather than inferring it from
+metadata. (For the raw camera file instead, use
+`media_analysis(action="extract_frames")`.)
+
+- `quality="frame"` (default) renders exactly that frame — the only
+  frame-accurate route. Full resolution, well under a second, works headless.
+  `preview` is the same render bounded to 1280px.
+- `quality="thumbnail"` is instant and touches nothing, but returns the **clip's**
+  thumbnail — identical for every frame of that clip. Use it to see which clip is
+  under the playhead, never to judge a specific frame. Needs the Color page *and*
+  Resolve frontmost.
+- `quality="still"` uses a Gallery still; requires the Gallery panel to be open.
+- `max_width` caps the width to conserve context (needs ffmpeg; without it the
+  call fails rather than quietly returning a full-size frame). `format` is `jpg`
+  (default), `png`, or `tif`.
+- `timecode` accepts absolute (`01:00:15:12`) or elapsed (`00:00:15:12`) time;
+  `frame` is the absolute timeline frame. Omit both to capture the playhead.
+
+The playhead, page, current timeline and Gallery are restored. The render route
+additionally touches project render settings: format and codec are restored and
+the render job is deleted, but `TargetDir`/`CustomName`/mark range cannot be read
+back on builds without `GetRenderSettings`, so they are reset to the full
+timeline rather than restored. Reach for `quality="thumbnail"` when zero side
+effects matter more than accuracy.
+
+```
+timeline_frame(action="capture", params={"timecode": "01:00:15:12", "max_width": 1280})
+```
+
+This tool is separate from `timeline` because a tool that returns image content
+cannot declare a `Dict[str, Any]` output schema — FastMCP validates returns
+against it, and image content fails that validation.
 
 **`timeline_ai`** — AI/ML analysis on the current timeline.
 
@@ -1494,7 +1667,12 @@ Key actions:
   clip version
 - `stabilize`, `smart_reframe`
 - `create_magic_mask(mode)` — mode: `"F"` forward, `"B"` backward, `"BI"` bidirectional
-  (requires DaVinci Neural Engine and Color page)
+  (requires DaVinci Neural Engine and Color page). Magic Mask v2 isolates via
+  operator CLICKS on the subject (manual ch. 139; strokes are legacy v1) and
+  the API cannot place clicks — with none present this returns
+  `{needs_hitl: true, hitl: {steps...}}` instead of a bare false. Never call it
+  as if it isolates a subject unattended; prove any isolation with a rendered
+  frame (`gallery_stills grab_and_export`).
 
 Color / Grade kernel actions (v2.11.0+) add safer grade inspection and
 boundary helpers: `grade_capabilities`, `probe_grade_item`,
@@ -1532,6 +1710,11 @@ Key actions:
   Returns `{files, format, folder, cleaned_up}` where each file entry includes
   `data_base64` for image files and `data` (text) for `.drx` grade files.
   `cleanup` defaults to `true` — files are deleted from disk after being inlined.
+  Only files this call produced are removed: the export goes to a private
+  staging directory inside `folder_path`, so anything else written there
+  meanwhile is untouched, and `folder_path` itself is removed only if the call
+  created it and left it empty. With `cleanup: false` the files are moved up
+  into `folder_path` without overwriting anything already there.
   Requires Color page with Gallery panel visible.
 - `delete_stills(still_indices)`
 
@@ -1576,6 +1759,20 @@ Key actions: `list`, `get_name(group_name)`, `set_name(group_name, new_name)`,
 Target a comp either from a timeline item (pass `clip_id`, `timeline_item_id`, or
 `timeline_item={track_type, track_index, item_index}`) or from the active Fusion
 page comp (omit timeline scope).
+
+READBACK IS NOT PROOF FOR FUSION PARAMETERS. Up to v2.98.4 every value write
+here ran inside a `Comp.Lock()`, and a value written under a comp lock is stored
+in the graph and returned by `get_input` while the RENDER ignores it entirely
+(Studio 19.1.3.7: PSNR inf vs the no-comp baseline). Four of the six affected
+paths — `set_input`, `safe_set_inputs`, `set_text_plus`, `add_fusion_mask` — were
+confirmed broken by rendering; `bulk_set_inputs` and `bulk_set_expressions`
+escape because they wrap their write in `StartUndo`/`EndUndo`. Fixed in v2.98.5,
+mechanism settled in v2.98.8, and guarded by
+`tests/test_fusion_value_write_lock.py` plus the rendered-frame harness
+`tests/live_fusion_value_write_validation.py`. The lesson outlives the bug: a
+Fusion parameter that reads back correctly has proven nothing about the output,
+so confirm any Fusion look with a rendered frame (`gallery_stills
+grab_and_export` or a frame from a delivered render), never with `get_input`.
 
 Key actions:
 - `add_tool(tool_type, x?, y?, name?)` — common types: `Merge`, `Background`,
@@ -1718,6 +1915,14 @@ media_pool(action="append_to_timeline", params={"clip_infos": [
   {"clip_id": "<uuid>", "start_frame": 0, "end_frame": 100, "record_frame": 1200, "track_index": 4}
 ]})
 ```
+
+Mixed-fps caution: `start_frame`/`end_frame` are SOURCE frames, and a source
+whose fps differs from the timeline's rounds DOWN on conversion — a 24.0 or
+29.97 clip appended into a 23.976 timeline can land one frame short of its
+slot. Plan durations in timeline frames, extend `end_frame` by a source frame
+when the floor misses, and finish with `detect_gaps_overlaps` (see
+`api_truth`). `import_media` always lands in the CURRENT bin — call
+`set_current_folder` first; there is no destination parameter.
 
 ### 4. Inspect and annotate timeline items
 
@@ -1979,15 +2184,49 @@ clip's comp, always pass `clip_id`, `timeline_item_id`, or `timeline_item`.
 
 ## Seeing What Resolve Sees (Visual Context)
 
-The server provides two mechanisms to inspect a frame as Resolve has processed it,
-including color grading, effects, and compositing — not just the raw source file.
+The server provides several mechanisms to inspect a frame as Resolve has processed
+it, including color grading, effects, and compositing — not just the raw source
+file.
 
-**`timeline_markers(action="get_thumbnail")`** — Returns raw thumbnail data at
-the current playhead position. The response is a dictionary with keys `data`,
-`format`, `width`, `height`, `noOfComponents`, and `depth`.
+WYSIWYG hierarchy (live-verified 2026-08-20): a `grab_and_export` gallery still
+faithfully reflects edit sizing (Inspector transforms) and grades; media-pool
+thumbnails and `thumbnail_contact_sheet` output do NOT reflect Fusion
+composition output. Also note that whether an API-created Fusion comp is
+honoured at render is Resolve-version-dependent: a wired comp rendered on
+Studio 19.1.3.7, but on Studio 21.0.4 the same Blur configuration and a
+Transform variant both rendered bit-identical to the no-comp baseline, and no
+API selects an item's active composition (api_truth
+'AddFusionComp'). The only acceptable proof of a Fusion or grade claim is a
+rendered frame: `grab_and_export`, an exported gallery still, or a frame
+extracted from a delivered render.
 
-**`timeline_markers(action="get_thumbnail_image")`** — Converts the same current
-frame thumbnail to PNG bytes and returns MCP image content without writing a file.
+**Start here: `timeline_frame(action="capture")`** — Returns the frame at the
+playhead (or at any `timecode`/`frame` you name) as MCP image content, so a
+multimodal assistant can simply look at it. It renders that one frame, which is
+what makes it frame-accurate; `max_width` bounds the context cost.
+
+```
+timeline_frame(action="capture", params={"timecode": "01:00:15:12", "max_width": 1280})
+```
+
+⚠️ **The thumbnail API is per-clip, not per-frame.** `GetCurrentClipThumbnailImage`
+returns the same image for every frame of a given clip — verified by seeking
+within one clip and getting byte-identical data, with the image changing only at
+a clip boundary. It also returns nothing unless Resolve is the frontmost app.
+Everything below is built on it, so none of it can confirm what a *specific*
+frame looks like. Use `timeline_frame` for that.
+
+**`timeline_markers(action="get_thumbnail")`** — Raw thumbnail data for the clip
+under the playhead: `data`, `format`, `width`, `height`, `noOfComponents`,
+`depth`. Use it when you need pixel data for tooling.
+
+**`timeline_markers(action="get_thumbnail_image")`** — The same clip thumbnail as
+image content; equivalent to `timeline_frame(action="capture", params={"quality":
+"thumbnail"})`. Kept for existing callers.
+
+**`timeline(action="thumbnail_contact_sheet")`** — A labeled PNG sheet written to
+the analysis root. Because it samples the same API, it is effectively one image
+per clip; treat it as a shot inventory, not as frame evidence.
 
 **`gallery_stills(action="grab_and_export", params={...})`** — Grabs a still from
 the current frame on the Color page and returns the image encoded as base64 in the

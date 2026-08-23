@@ -35,6 +35,14 @@ rather than guessing** if it is absent:
 `python scripts/doctor.py` reports which are present. `media_analysis`
 `capabilities` covers the analysis stack in more detail.
 
+**Install them into the environment the server runs from.** A managed install
+uses its own virtualenv, and `pip install` from an unrelated shell puts the
+package somewhere that interpreter never looks. Use the venv's own pip —
+`<install>/venv/bin/pip` (`venv\Scripts\pip.exe` on Windows) — or activate it
+first. Command-line tools that come with a package (`openai-whisper` installs a
+`whisper` executable) are found in that venv's script directory automatically
+since v2.98.2; before that they had to be on PATH by hand.
+
 Model weights carry their own licences, separate from the code that loads them.
 
 > **Python 3.13 / 3.14:** these are **allowed** — setup will use them and warn.
@@ -88,6 +96,7 @@ The installer can automatically configure any of these clients:
 | Zed | `~/.config/zed/settings.json` |
 | Continue | `~/.continue/config.json` |
 | OpenCode | `~/.config/opencode/opencode.json` (or project-root `opencode.json`) |
+| Codex CLI | `~/.codex/config.toml` (or `$CODEX_HOME/config.toml`) — TOML `[mcp_servers.davinci-resolve]` |
 | JetBrains IDEs | Manual (Settings > Tools > AI Assistant > MCP) |
 
 You can configure multiple clients at once, or use `--clients manual` to get copy-paste config snippets.
@@ -132,8 +141,8 @@ The MCP server comes in two modes:
 
 | Mode | File | Tools | Best For |
 |------|------|-------|----------|
-| **Compound** (default) | `src/server.py` | 32 | Most users — fast, clean, low context usage |
-| **Full** | `src/resolve_mcp_server.py` | 341 | Power users who want one tool per API method |
+| **Compound** (default) | `src/server.py` | 36 | Most users — fast, clean, low context usage |
+| **Full** | `src/resolve_mcp_server.py` | 353 | Power users who want one tool per API method |
 
 The compound server's `timeline_item` tool includes dedicated actions for common workflows:
 
@@ -148,7 +157,7 @@ The compound server's `timeline_item` tool includes dedicated actions for common
 
 The installer uses the compound server by default. To use the full server:
 ```bash
-python src/server.py --full    # Launch full 341-tool server
+python src/server.py --full    # Launch full 353-tool server
 # Or point your MCP config directly at src/resolve_mcp_server.py
 ```
 
@@ -195,6 +204,21 @@ If you prefer to set things up yourself, add to your MCP client config:
   }
 }
 ```
+
+Codex CLI uses TOML instead. Add to `~/.codex/config.toml` (or
+`$CODEX_HOME/config.toml`):
+
+```toml
+[mcp_servers.davinci-resolve]
+command = "/path/to/venv/bin/python"
+args = ["/path/to/davinci-resolve-mcp/src/server.py"]
+env = { RESOLVE_SCRIPT_API = "/path/to/DaVinci Resolve/Developer/Scripting", RESOLVE_SCRIPT_LIB = "/path/to/fusionscript.so-or-dll", PYTHONPATH = "/path/to/DaVinci Resolve/Developer/Scripting/Modules" }
+```
+
+Paths must be absolute — Codex does not expand `~`. Run
+`python install.py --clients codex` to have the installer write this block for
+you (it merges into an existing config and leaves your other servers and
+comments alone).
 
 On Windows, installer-generated configs also include `PYTHONHOME`. That scopes Resolve's Python binding to the selected interpreter and avoids the Resolve 20.3 multi-Python crash reported in [Issue #26](https://github.com/samuelgursky/davinci-resolve-mcp/issues/26).
 

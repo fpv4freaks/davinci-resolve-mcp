@@ -12,6 +12,20 @@ Thin router; depth stays in the kernel.
 - **Offline planning + bus routing** — `resolve-advanced/README.md` →
   `audio_plan`, `fairlight`, `audio`.
 
+## Rough mix before anything else
+
+If the ask is "make this sound balanced" rather than "route these buses", start with
+`media_analysis mix_plan` (Python server, no Resolve needed). Give it the dialogue stems
+and it derives the dialogue-normalisation gain, the music-bed level under it, and ducking
+windows from the dialogue's own silence — then renders a premix and **measures it**, so
+what you report is the loudness achieved rather than the gain arithmetic.
+
+`dry_run` defaults to true: show the gains and the window count first. On a
+full-programme standard (`ebu_r128`, `web`) a measured programme trim lands the whole mix
+on target; on `ott_dialogue_gated` it deliberately does not trim, because dialogue is the
+figure being graded. Flags (`loudness_off_target`, `true_peak_over`, `clipped`) come back
+with remedies and are never auto-corrected — report them, do not paper over them.
+
 ## Two servers — plan/measure offline, apply live
 
 | Job | Server | Tools |
@@ -56,6 +70,18 @@ Thin router; depth stays in the kernel.
   generated item types; `AutoSyncAudio` depends on media + Resolve's sync engine.
 - The public API does not expose Fairlight mix automation curves or plugin graphs
   — use `fairlight` for bus structure, not automation.
+- **The whole-mix preset workaround is version-gated, and it is the only write
+  path there is.** Per-parameter Fairlight control does not exist at any version;
+  what exists is `GetFairlightPresets` + `ApplyFairlightPresetToCurrentTimeline`,
+  which apply a saved mix wholesale. Both require **Resolve 20.2.2+** and are
+  absent on 19.1.3 (confirmed live). So on an older build the per-parameter gap
+  is the entire story and there is no workaround to offer — check with
+  `resolve_control check_version_support` before proposing one, and say the build
+  is too old rather than suggesting a call that will not be there.
+- The **AI Audio Assistant** (one-click auto-mix) is not scriptable on any build
+  — no method exists on `Resolve`, `Project`, `Timeline` or `TimelineItem`
+  (issue #128). Presets cover the repeatable-template case, never the
+  content-adaptive one.
 
 Never modify/transcode/derive source media (AGENTS.md) — the offline `audio` ops
 write NEW files to scratch, never over source.

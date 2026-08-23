@@ -17,6 +17,7 @@ import os
 import platform as _platform
 import re
 import shutil
+import signal
 import sqlite3
 import subprocess
 import sys
@@ -334,8 +335,20 @@ def _ensure_path_includes_standard_tool_dirs() -> None:
     /opt/homebrew/bin/ffprobe. Subprocess calls (subprocess.run(["ffprobe"...]))
     then also fail to find the binary. Prepending the standard tool dirs here
     fixes both detection and execution for every importer of this module.
+
+    The interpreter's own script directory is one of them, and it was missing.
+    A console script installed into the server's virtualenv — `pip install
+    openai-whisper` puts `whisper` in `venv/Scripts` on Windows, `venv/bin`
+    elsewhere — is only on PATH when that environment has been *activated*, and
+    nothing activates it: the client launches `venv/python server.py` directly.
+    So the tool was installed, working, and invisible, and `capabilities`
+    reported `whisper_cli.available: false` with no hint as to why (#153, where
+    the workaround that appeared to fix it was a shim placed on PATH by hand).
     """
     candidates = [
+        # The venv this server is running from, first: a tool installed
+        # deliberately alongside it should win over an older copy elsewhere.
+        os.path.dirname(os.path.abspath(sys.executable)),
         "/opt/homebrew/bin",
         "/opt/homebrew/sbin",
         "/usr/local/bin",
@@ -2376,23 +2389,105 @@ def build_plan(
     }
 
 
-def _run_command(args: List[str], timeout: int = COMMAND_TIMEOUT_SECONDS) -> Tuple[int, str, str]:
+def _kill_process_tree(pid: int) -> None:
+    """Best-effort: terminate pid and its descendants, not just the direct child.
+
+    Popen.kill() reaches only the immediate child. On Windows a bare-name PATH
+    lookup can resolve to a wrapper — a Chocolatey/npm shim, a pip console
+    script — that runs the real work as a grandchild, which a single-PID kill
+    leaves untouched. Measured: `ffmpeg` on PATH was a 392KB shim, and a 5s
+    timeout against an ~82s real ffmpeg pass had no effect at all, because the
+    surviving grandchild still held the stdout/stderr handles it had inherited
+    and the follow-up read blocked until it finished on its own.
+
+    Failure here is never fatal. The caller is already on its error path and
+    owes its own caller a (code, stdout, stderr) tuple, so this must not raise:
+    `taskkill` can be absent from PATH and `killpg` can return EPERM, which is
+    why the whole branch catches OSError rather than only ProcessLookupError.
+    """
     try:
-        proc = subprocess.run(
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(pid)],
+                capture_output=True,
+                check=False,
+            )
+        else:
+            os.killpg(pid, signal.SIGKILL)
+    except OSError:
+        pass
+
+
+# How long to wait for the pipes to drain after a tree kill. The kill is
+# best-effort, so this read has to be bounded: anything that escaped it still
+# holds the inherited pipe handles, and an unbounded read there would hang for
+# exactly the reason the kill exists.
+_POST_KILL_DRAIN_SECONDS = 5
+
+
+def _run_command(
+    args: List[str],
+    timeout: int = COMMAND_TIMEOUT_SECONDS,
+    env: Optional[Dict[str, str]] = None,
+) -> Tuple[int, str, str]:
+    """Run args to completion and return (returncode, stdout, stderr).
+
+    Spawned via Popen rather than subprocess.run so a timeout can kill the whole
+    process tree instead of one PID — see _kill_process_tree.
+
+    `env=None` inherits this process's environment, matching what subprocess.run
+    did. Pass an explicit mapping for a child that must not inherit it: on
+    Windows this server sets PYTHONHOME so the fusionscript bridge can find
+    Resolve's Python, and a child that is itself a *different* Python (the
+    whisper CLI) dies loading a foreign stdlib against its own C extensions.
+
+    Returns 124 on timeout, 127 when the binary cannot be spawned.
+    """
+    popen_kwargs: Dict[str, Any] = {}
+    if os.name == "nt":
+        # Isolates the child from console signals sent to the server. Note this
+        # is not what makes the tree kill work — taskkill /T walks parent-child
+        # links, not process groups. start_new_session is load-bearing on POSIX,
+        # where killpg needs the child to lead a group of its own.
+        popen_kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+    else:
+        popen_kwargs["start_new_session"] = True
+    try:
+        proc = subprocess.Popen(
             args,
-            capture_output=True,
-            timeout=timeout,
-            check=False,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            env=env,
+            **popen_kwargs,
         )
-    except subprocess.TimeoutExpired as exc:
-        stdout = exc.stdout.decode("utf-8", errors="replace") if exc.stdout else ""
-        stderr_tail = exc.stderr.decode("utf-8", errors="replace") if exc.stderr else ""
-        return 124, stdout, f"Command timed out after {timeout}s. {stderr_tail}".strip()
     except OSError as exc:
         return 127, "", str(exc)
-    stdout = proc.stdout.decode("utf-8", errors="replace") if proc.stdout else ""
-    stderr = proc.stderr.decode("utf-8", errors="replace") if proc.stderr else ""
-    return proc.returncode, stdout, stderr
+    try:
+        stdout, stderr = proc.communicate(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        _kill_process_tree(proc.pid)
+        abandoned = False
+        try:
+            stdout, stderr = proc.communicate(timeout=_POST_KILL_DRAIN_SECONDS)
+        except subprocess.TimeoutExpired:
+            # A descendant outlived the tree kill and still holds the pipes.
+            # Give up the output rather than block — a stalled caller is a
+            # worse outcome than a timeout report with no stderr tail.
+            stdout, stderr = b"", b""
+            abandoned = True
+        stdout_s = stdout.decode("utf-8", errors="replace") if stdout else ""
+        stderr_s = stderr.decode("utf-8", errors="replace") if stderr else ""
+        detail = " Output abandoned: a descendant survived the kill." if abandoned else ""
+        return 124, stdout_s, f"Command timed out after {timeout}s.{detail} {stderr_s}".strip()
+    except BaseException:
+        # subprocess.run kills the child on any exception on the way out;
+        # Popen does not. Under the server's threaded dispatch a cancellation
+        # or KeyboardInterrupt here would otherwise leave an orphaned tree.
+        _kill_process_tree(proc.pid)
+        raise
+    stdout_s = stdout.decode("utf-8", errors="replace") if stdout else ""
+    stderr_s = stderr.decode("utf-8", errors="replace") if stderr else ""
+    return proc.returncode, stdout_s, stderr_s
 
 
 def _write_json(path: str, payload: Dict[str, Any]) -> None:
@@ -2564,17 +2659,17 @@ def _ffmpeg_stderr_filter(path: str, video_filter: Optional[str] = None, audio_f
 
 
 def _parse_loudness(stderr: str) -> Dict[str, Any]:
-    def latest(pattern: str) -> Optional[float]:
-        matches = re.findall(pattern, stderr)
-        if not matches:
-            return None
-        return _parse_float(matches[-1])
+    """EBU R128 figures from ffmpeg's `ebur128` output.
 
-    return {
-        "integrated_lufs": latest(r"I:\s*(-?\d+(?:\.\d+)?)\s*LUFS"),
-        "loudness_range_lu": latest(r"LRA:\s*(-?\d+(?:\.\d+)?)\s*LU"),
-        "true_peak_dbtp": latest(r"Peak:\s*(-?\d+(?:\.\d+)?)\s*dBFS"),
-    }
+    Delegates to `loudness_parse`, which bounds the summary block rather than taking the
+    last match in the stream. `ebur128`'s per-frame progress lines carry their own `I:`,
+    `LRA:` and peak fields, so a last-match read is right only while the summary happens
+    to print last — and when it is not, the numbers still parse and a single frame is
+    reported as a programme measurement, with nothing to notice.
+    """
+    from src.utils import loudness_parse
+
+    return dict(loudness_parse.parse_loudness(stderr, to_float=_parse_float))
 
 
 def _parse_scene_changes(stderr: str) -> List[Dict[str, Any]]:
@@ -4023,7 +4118,28 @@ def _transcribe_with_whisper_cli(path: str, artifacts: Dict[str, Any], transcrip
     ]
     if transcription.get("language"):
         cmd.extend(["--language", str(transcription["language"])])
-    code, _, stderr = _run_command(cmd, timeout=int(transcription.get("timeout", 1800)))
+    # PYTHONHOME/PYTHONPATH point this server at Resolve's bundled Python so
+    # DaVinciResolveScript imports. Inherited by a child that is itself a
+    # *different* Python, they corrupt its stdlib resolution — and the whisper
+    # CLI is exactly that: a Python program, frequently on another interpreter
+    # entirely. Measured: whisper under Python 3.14 inheriting a 3.10
+    # PYTHONHOME loads 3.10's stdlib against its own compiled extensions and
+    # dies on `AssertionError: SRE module mismatch`. That crash is fast, not a
+    # hang; it only reads as one when something else delays the response.
+    #
+    # This is the shipped Windows configuration, not a local quirk: install.py
+    # writes PYTHONHOME into generated client configs (see docs/install.md,
+    # issue #26), and server.py sets it on Windows whenever it isn't already
+    # set. So every Windows install hands a foreign PYTHONHOME to every child
+    # it spawns, and any Python-based tool added here needs the same scrub.
+    #
+    # PYTHONIOENCODING=utf-8 is unrelated: it avoids a UnicodeEncodeError in
+    # whisper's own argparse help text on a non-UTF-8 console.
+    whisper_env = dict(os.environ)
+    whisper_env.pop("PYTHONHOME", None)
+    whisper_env.pop("PYTHONPATH", None)
+    whisper_env["PYTHONIOENCODING"] = "utf-8"
+    code, _, stderr = _run_command(cmd, timeout=int(transcription.get("timeout", 1800)), env=whisper_env)
     if code != 0:
         return {"success": False, "backend": "whisper_cli", "error": stderr.strip() or "whisper CLI failed"}
     json_files = sorted(Path(work_dir).glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)

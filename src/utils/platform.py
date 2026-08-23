@@ -64,12 +64,113 @@ def get_resolve_paths():
     env_lib = os.environ.get("RESOLVE_SCRIPT_LIB")
     if env_lib and os.path.isfile(env_lib):
         lib_path = env_lib
+    elif not os.path.isfile(lib_path):
+        # No usable override and nothing at the default: look for the real
+        # install before handing back a path we already know is not there.
+        # The default is kept as the return value when discovery finds nothing,
+        # so the failure message still names the location people expect.
+        lib_path = discover_scripting_lib(platform_name) or lib_path
 
     return {
         "api_path": api_path,
         "lib_path": lib_path,
         "modules_path": modules_path
     }
+
+
+def _windows_lib_candidates():
+    r"""Plausible `fusionscript.dll` locations on this machine.
+
+    `%PROGRAMFILES%` is not a constant — a 64-bit install can sit under
+    `%PROGRAMW6432%` — and Resolve is routinely moved to a second drive
+    because the application and its caches are large. Every drive letter that
+    responds to `isdir` is probed, two fixed paths each, no directory walk;
+    A: and B: are skipped so a machine with a floppy-mapped letter does not
+    stall. No drive-type check is made, so a mapped network drive that happens
+    to be connected is probed too — the cost is bounded (two `isfile` calls)
+    and the alternative is a `GetDriveTypeW` ctypes call for a case that only
+    arises once, on the path where the default was already missing.
+
+    This is reached from `get_resolve_paths()`, which runs at import time, so
+    the real cost is one `ps`/`wmic` spawn at server startup and only when the
+    platform default is absent.
+    """
+    relative = os.path.join("Blackmagic Design", "DaVinci Resolve", "fusionscript.dll")
+    candidates = []
+    for variable in ("PROGRAMFILES", "PROGRAMW6432", "PROGRAMFILES(X86)"):
+        base = os.environ.get(variable)
+        if base:
+            candidates.append(os.path.join(base, relative))
+    for letter in "CDEFGHIJKLMNOPQRSTUVWXYZ":
+        drive = f"{letter}:\\"
+        if not os.path.isdir(drive):
+            continue
+        candidates.append(os.path.join(drive, relative))
+        candidates.append(os.path.join(drive, "Program Files", relative))
+    return candidates
+
+
+def _macos_lib_candidates():
+    """The App Store bundle as well as the installer one.
+
+    The default above names `/Applications/DaVinci Resolve/DaVinci Resolve.app`.
+    The App Store build installs to `/Applications/DaVinci Resolve.app` instead —
+    the same class of miss as a Windows install on another drive, and
+    `resolve_runtime.MACOS_RESOLVE_APPS` already records both.
+    """
+    inside_bundle = os.path.join("Contents", "Libraries", "Fusion", "fusionscript.so")
+    bundles = (
+        "/Applications/DaVinci Resolve/DaVinci Resolve.app",
+        "/Applications/DaVinci Resolve.app",
+    )
+    return [os.path.join(bundle, inside_bundle) for bundle in bundles]
+
+
+def _linux_lib_candidates():
+    """The documented /opt layouts, both of which Blackmagic has shipped."""
+    return [
+        "/opt/resolve/libs/Fusion/fusionscript.so",
+        "/opt/resolve/libs/fusionscript.so",
+        "/opt/resolve/bin/fusionscript.so",
+    ]
+
+
+def discover_scripting_lib(platform_name=None):
+    """Locate the scripting library of a Resolve installed outside the default.
+
+    Order: the running Resolve first — its executable path is the install
+    location, so it needs no guessing and covers every platform — then the
+    conventional roots for that platform, for when Resolve is not up at the
+    moment (installer runs, cold starts).
+
+    Returns None when nothing is found, which leaves the caller's default in
+    place rather than substituting a second guess.
+    """
+    if platform_name is None:
+        platform_name = get_platform()
+
+    # Relative import and a narrow except: this repo has had a run of
+    # silent-fallback bugs, and a bare `except Exception` here would swallow a
+    # real defect inside running_resolve_lib() as "Resolve is not running".
+    try:
+        from .resolve_runtime import running_resolve_lib
+    except ImportError:
+        running_resolve_lib = None
+    running = running_resolve_lib() if running_resolve_lib else None
+    if running and os.path.isfile(running):
+        return running
+
+    by_platform = {
+        'windows': _windows_lib_candidates,
+        'darwin': _macos_lib_candidates,
+        'linux': _linux_lib_candidates,
+    }
+    builder = by_platform.get(platform_name)
+    candidates = builder() if builder else []
+    for candidate in candidates:
+        if os.path.isfile(candidate):
+            return candidate
+    return None
 
 def get_resolve_plugin_paths():
     """Get platform-specific paths for Resolve plugin install dirs.

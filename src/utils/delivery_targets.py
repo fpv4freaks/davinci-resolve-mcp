@@ -90,17 +90,43 @@ than emitting a spec that would be checked against an arbitrary single frame.
 Every target must have one or the other — a missing QC projection is always
 explained, never silent.
 
-## Live-verified against the real matrix
+## Live-verified against the real matrix, twice
 
-Codec candidates were checked against DaVinci Resolve Studio 19.1.3.7 on
-2026-07-27 (20 formats / 271 format-codec pairs). That pass corrected real
-mistakes — plain `"DNxHR HQX"` and `"DNxHR 444"` do not exist (the live labels
-carry a bit depth: `"DNxHR HQX 10-bit"`), DPX/TIFF codecs are spelled
-`"RGB 10 bits"` not `"RGB 10-bit"`, PNG is not a render format at all, and the
-`Wave` format exposes **zero** codecs and rejects every codec value passed to
-`SetCurrentRenderFormatAndCodec`, so an audio-only WAV target is not expressible
-through this API. Availability still varies by version, license, and installed
-IO plugins, so resolution remains live.
+Checked against **19.1.3.7** (2026-07-27, 20 formats / 271 pairs) and again
+against **21.0.4.5** (2026-08-12, 23 formats / 326 pairs).
+
+The 19.x pass corrected guessed spellings: plain `"DNxHR HQX"` / `"DNxHR 444"`
+never existed (the labels carry a bit depth), and DPX/TIFF codecs are spelled
+`"RGB 10 bits"`, not `"RGB 10-bit"`.
+
+The 21.x pass produced the more useful lesson: **codec ids were stable across the
+two majors while descriptions were not.** Every DNx description gained an `"Avid "`
+prefix in 21.x (`"DNxHR HQ"` -> `"Avid DNxHR HQ 12-bit"`) while the ids
+(`DNxHRHQ`, `DNxHRLB`, `DNxHRHQX_10`) did not move. Four targets broke, and the
+only reason the other DNx targets survived is that their candidate lists happened
+to contain the real id. So **every codec candidate list leads with the id**, and
+description spellings follow it — that ordering is what makes the table survive a
+major-version upgrade.
+
+Two findings changed between the builds and should not be treated as fixed facts:
+
+- **PNG and WebP.** Not render formats on 19.1.3.7; they *are* on 21.0.4.5, so
+  `png_sequence` and `webp_animated` resolve on 21.x and fail loudly on 19.x,
+  which is correct behavior rather than a regression. PNG exposes RGB only — no
+  alpha codec — so it does not replace `dpx_sequence` for transparency.
+- **A format can advertise a codec it will not accept.** `HLS` (m3u8) returns a
+  codec from `GetRenderCodecs` and real rasters from `GetRenderResolutions`, yet
+  `SetCurrentRenderFormatAndCodec` rejects every value. Resolving a target proves
+  only that the pair is *listed*; the authoritative test is queuing a job, which
+  is why `prepare_delivery_job` refuses to queue on a rejected pair.
+- **Zero-codec formats.** `wav` and `gif` on 19.x; `braw`, `mts` and `wav` on
+  21.x — `gif` gained codecs, BRAW and MTS lost them. `wav` is the constant, so
+  an audio-only WAV target remains inexpressible through
+  `SetCurrentRenderFormatAndCodec`, which rejects every value including the
+  empty string.
+
+Availability varies by version, license, and installed IO plugins, so resolution
+stays live and neither count above is a target to compare against.
 
 ## ffprobe gotcha encoded here
 
@@ -135,7 +161,9 @@ TIERS = ("master", "web", "sequence", "broadcast", "package")
 
 #: What the shipped candidates were checked against. Availability is still
 #: machine/license/plugin dependent, so resolution happens live regardless.
-VERIFIED_ON = "DaVinci Resolve Studio 19.1.3.7 (2026-07-27, 20 formats / 271 pairs)"
+VERIFIED_ON = (
+    "DaVinci Resolve Studio 21.0.4.5 (2026-08-12, 23 formats / 326 pairs); first verified on 19.1.3.7 (2026-07-27, 20 formats / 271 pairs)"
+)
 
 
 # ── Loudness standards ──────────────────────────────────────────────────────
@@ -471,33 +499,35 @@ DELIVERY_TARGETS: Dict[str, DeliveryTarget] = {
     # ── Mastering: DNxHR family ─────────────────────────────────────────────
     "dnxhr_lb_master": _dnxhr(
         "dnxhr_lb_master", "LB",
-        ("DNxHR LB", "DNxHR_LB"),
+        ("DNxHRLB", "Avid DNxHR LB 12-bit", "DNxHR LB"),
         "Low-bandwidth DNxHR. Offline/review, not finishing.",
     ),
     "dnxhr_sq_master": _dnxhr(
         "dnxhr_sq_master", "SQ",
-        ("DNxHR SQ", "DNxHR_SQ"),
+        ("DNxHRSQ", "Avid DNxHR SQ 12-bit", "DNxHR SQ"),
         "Standard-quality DNxHR. Avid-family review and distribution.",
     ),
     "dnxhr_hq_master": _dnxhr(
         "dnxhr_hq_master", "HQ",
-        ("DNxHR HQ", "DNxHR_HQ"),
+        ("DNxHRHQ", "Avid DNxHR HQ 12-bit", "DNxHR HQ"),
         "High-quality 8-bit DNxHR. Common Avid mezzanine.",
     ),
-    # Live matrix carries a bit depth in the label — plain "DNxHR HQX" does not exist.
+    # Codec IDS proved stable across 19.1.3.7 -> 21.0.4.5 while DESCRIPTIONS did not:
+    # every DNx description gained an "Avid " prefix in 21.x, and plain "DNxHR HQX"
+    # never existed. So the id leads each candidate list and descriptions follow.
     "dnxhr_hqx_master": _dnxhr(
         "dnxhr_hqx_master", "HQX 10-bit",
-        ("DNxHR HQX 10-bit", "DNxHRHQX_10", "DNxHR HQX 12-bit", "DNxHRHQX_12", "DNxHR HQX"),
+        ("DNxHRHQX_10", "Avid DNxHR HQX 10-bit", "DNxHR HQX 10-bit", "DNxHRHQX_12", "DNxHR HQX"),
         "10-bit DNxHR. The DNx tier to use for finishing and HDR.",
     ),
     "dnxhr_444_master": _dnxhr(
         "dnxhr_444_master", "444 12-bit",
-        ("DNxHR 444 12-bit", "DNxHR444_12", "DNxHR 444 10-bit", "DNxHR444_10", "DNxHR 444"),
+        ("DNxHR444_12", "Avid DNxHR 444 12-bit", "DNxHR 444 12-bit", "DNxHR444_10", "DNxHR 444"),
         "4:4:4 12-bit DNxHR. Highest DNx tier for finishing.",
     ),
     "dnxhd_1080p220_10_master": _dnxhr(
         "dnxhd_1080p220_10_master", "HD 1080p 220 10-bit",
-        ("DNxHD 1080p 220/185/175 10-bit", "DNxHD1080p220_10"),
+        ("DNxHD1080p220_10", "Avid DNxHD 1080p 220/185/175 10-bit", "DNxHD 1080p 220/185/175 10-bit"),
         "HD-era 10-bit DNxHD for Avid finishing at 1920x1080.",
         width=1920,
         height=1080,
@@ -554,6 +584,63 @@ DELIVERY_TARGETS: Dict[str, DeliveryTarget] = {
         ("RGB 16 bits", "RGB16", "RGB 8 bits"),
         "TIFF frames for stills-oriented or archival handoff.",
     ),
+    "png_sequence": _sequence(
+        "png_sequence", "PNG image sequence", ("PNG", "png"),
+        ("RGB16", "RGB 16 bits", "RGB8", "RGB 8 bits"),
+        "PNG frames for web and motion-graphics handoff.",
+        notes=(
+            "RGB ONLY — Resolve exposes no alpha PNG codec (21.0.4.5 offers just "
+            "'RGB 16 bits' / 'RGB 8 bits'). For transparency use dpx_sequence "
+            "('RGBA 8 bits') or prores4444_master.",
+            "PNG is not a render format on Resolve 19.x; this target resolves on 21.x+.",
+        ),
+    ),
+    # ── Animated web assets ─────────────────────────────────────────────────
+    # Not _web(): that helper pins mp4 and requires a raster. These carry no
+    # audio track at all, so export_audio is False rather than merely unpinned.
+    "gif_animated": DeliveryTarget(
+        id="gif_animated",
+        label="Animated GIF",
+        describe="Looping animated GIF for web/social placement. No audio.",
+        tier="web",
+        format_candidates=("GIF", "gif"),
+        codec_candidates=("Animated_GIF", "Animated GIF"),
+        qc_container="gif",
+        qc_codec="gif",
+        export_audio=False,
+        verified=_VERIFIED,
+        source="Live matrix: GIF render format; ffprobe values measured on a generated .gif.",
+        notes=(
+            "GIF carries no audio and is palette-limited to 256 colours; prefer "
+            "webp_animated where the destination supports it.",
+            "Raster and rate inherit the timeline — set them explicitly for a "
+            "placement with a fixed spec.",
+        ),
+    ),
+    "webp_animated": DeliveryTarget(
+        id="webp_animated",
+        label="Animated WebP",
+        describe="Looping animated WebP for web placement. No audio.",
+        tier="web",
+        format_candidates=("WebP", "webp"),
+        codec_candidates=("Animated_WEBP", "Animated WebP"),
+        export_audio=False,
+        # No QC projection on purpose — see qc_skip_reason. Guessing "webp"/"webp"
+        # would produce failures that say nothing about the deliverable, which is
+        # the exact trap the mp4-reports-as-mov case taught.
+        qc_skip_reason=(
+            "ffprobe container/codec values for animated WebP are unverified: the "
+            "reference machine's ffmpeg has only the webp_pipe still-image demuxer, "
+            "so a rendered animated WebP could not be probed. Measure and fill in "
+            "qc_container/qc_codec on a build with full WebP support."
+        ),
+        verified=_VERIFIED,
+        source="Live matrix: WebP render format (ffprobe side unmeasured).",
+        notes=(
+            "WebP carries no audio track.",
+            "WebP is not a render format on Resolve 19.x; this target resolves on 21.x+.",
+        ),
+    ),
     # ── Broadcast / Avid handoff ────────────────────────────────────────────
     "dnxhr_hq_mxf_opatom": DeliveryTarget(
         id="dnxhr_hq_mxf_opatom",
@@ -561,7 +648,7 @@ DELIVERY_TARGETS: Dict[str, DeliveryTarget] = {
         describe="Avid-native handoff: MXF OP-Atom essence, DNxHR HQ.",
         tier="broadcast",
         format_candidates=("MXF OP-Atom", "MXF_OP_Atom", "mxf_op_atom"),
-        codec_candidates=("DNxHR HQ", "DNxHR_HQ"),
+        codec_candidates=("DNxHRHQ", "Avid DNxHR HQ 12-bit", "DNxHR HQ"),
         qc_container="mxf",
         qc_codec="dnxhd",
         audio_channels=2,
@@ -620,6 +707,13 @@ DELIVERY_TARGETS: Dict[str, DeliveryTarget] = {
             "need a human. easyDCP variants exist on this install too.",
         ),
     ),
+    # No HLS target. `HLS` (m3u8) looks fully supported through the query APIs on
+    # 21.0.4.5 — GetRenderCodecs returns {'H.264': 'H264'} and GetRenderResolutions
+    # returns real rasters — but SetCurrentRenderFormatAndCodec('m3u8', ...) is
+    # rejected for every value tried ('H264', 'H.264', 'h264', ''), while the same
+    # call for mp4/H264 succeeds. The matrix advertises a pair that cannot be
+    # selected, so a target for it would fail 100% of the time.
+    # Verified on Studio 21.0.4.5, 2026-08-12. See api_truth.py.
 }
 
 VALID_TARGETS = frozenset(DELIVERY_TARGETS)
@@ -652,6 +746,9 @@ TARGET_ALIASES: Dict[str, str] = {
     "dnx_master": "dnxhr_hqx_master",
     "avid": "dnxhr_hq_mxf_opatom",
     "vfx": "exr_sequence",
+    "png": "png_sequence",
+    "gif": "gif_animated",
+    "webp": "webp_animated",
 }
 
 #: Fields a caller may override per call. Deliberately excludes id/label/tier/

@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 
+from src.utils.delivery_targets import DELIVERY_TARGETS
 from src.server import (
     _list_delivery_targets,
     _prepare_delivery_job,
@@ -164,6 +165,36 @@ class RenderDeliverProbeTest(unittest.TestCase):
         self.assertFalse(result["valid"])
         self.assertIn("TargetDir must be under the system temp directory", result["errors"][0])
 
+    def test_validate_render_settings_accepts_2104_keys(self):
+        result = _validate_render_settings_action(
+            {"settings": {"UseFullExtents": False, "AddFrameHandles": 12, "DataBurnIn": "None"}}
+        )
+
+        self.assertTrue(result["valid"])
+        self.assertEqual(result["unknown_keys"], [])
+        self.assertEqual(result["warnings"], [])
+
+    def test_validate_render_settings_types_2104_keys(self):
+        result = _validate_render_settings_action(
+            {"settings": {"UseFullExtents": "yes", "AddFrameHandles": -3, "DataBurnIn": 7}}
+        )
+
+        self.assertFalse(result["valid"])
+        joined = " ".join(result["errors"])
+        self.assertIn("UseFullExtents must be a boolean", joined)
+        self.assertIn("AddFrameHandles must be >= 0", joined)
+        self.assertIn("DataBurnIn must be a string", joined)
+
+    def test_validate_render_settings_warns_handles_ignored_under_full_extents(self):
+        # Resolve accepts the combination but silently ignores the handle count —
+        # the validator stays valid and says so out loud instead.
+        result = _validate_render_settings_action(
+            {"settings": {"UseFullExtents": True, "AddFrameHandles": 12}}
+        )
+
+        self.assertTrue(result["valid"])
+        self.assertIn("AddFrameHandles is ignored while UseFullExtents is true", result["warnings"][0])
+
     def test_safe_set_render_settings_reports_diff_and_restores(self):
         project = RenderProjectStub()
         result = _safe_set_render_settings(
@@ -194,6 +225,93 @@ class RenderDeliverProbeTest(unittest.TestCase):
         self.assertTrue(result["success"])
         self.assertEqual(result["job_id"], "job-1")
         self.assertEqual(project.format_codec["format"], "mp4")
+
+    def test_prepare_render_job_warns_that_preset_state_is_inherited(self):
+        """Issue #123: an unpinned video job inherits unreadable Deliver state.
+
+        The measured failure returned success=True with IsExportVideo=True on the
+        job and an mp4 with no video stream on disk, so the warning is the only
+        place a caller learns the readback is not a witness.
+        """
+        project = RenderProjectStub()
+        result = _prepare_render_job(
+            project,
+            {
+                "target_dir": tempfile.gettempdir(),
+                "custom_name": "unpinned_video",
+                "settings": {"ExportVideo": True},
+            },
+        )
+
+        self.assertTrue(result["success"])
+        codes = [w["code"] for w in result.get("warnings", [])]
+        self.assertIn("RENDER_PRESET_STATE_INHERITED", codes)
+
+    def test_prepare_render_job_from_preset_pins_state_before_settings(self):
+        """LoadRenderPreset must run BEFORE SetRenderSettings.
+
+        Reversed, the preset overwrites the caller's explicit keys instead of
+        being overwritten by them — the same wrong file, arrived at backwards.
+        """
+        project = RenderProjectStub()
+        calls = []
+        project.LoadRenderPreset = lambda name: (calls.append(("load", name)), True)[1]
+        original_set = project.SetRenderSettings
+        project.SetRenderSettings = lambda s: (calls.append(("set", dict(s))), original_set(s))[1]
+
+        result = _prepare_render_job(
+            project,
+            {
+                "target_dir": tempfile.gettempdir(),
+                "custom_name": "pinned_video",
+                "from_preset": "H.264 Master",
+                "settings": {"ExportVideo": True},
+            },
+        )
+
+        self.assertTrue(result["success"])
+        self.assertEqual(result["preset_pinned"], {"preset": "H.264 Master", "loaded": True})
+        self.assertEqual([c[0] for c in calls], ["load", "set"])
+        # Pinning replaces the warning — the base state is no longer a guess.
+        self.assertNotIn(
+            "RENDER_PRESET_STATE_INHERITED",
+            [w["code"] for w in result.get("warnings", [])],
+        )
+
+    def test_prepare_render_job_rejects_unknown_preset_without_queueing(self):
+        project = RenderProjectStub()
+
+        result = _prepare_render_job(
+            project,
+            {
+                "target_dir": tempfile.gettempdir(),
+                "from_preset": "Audio Only",
+                "settings": {"ExportVideo": True},
+            },
+        )
+
+        self.assertFalse(result.get("success"))
+        self.assertEqual(result["error"]["code"], "RENDER_PRESET_NOT_FOUND")
+        self.assertEqual(result["error"]["state"]["available_presets"], ["H.264 Master"])
+        self.assertEqual(project.jobs, {})
+
+    def test_prepare_render_job_refuses_when_preset_load_returns_false(self):
+        """A bare False must not fall through to an inheriting render."""
+        project = RenderProjectStub()
+        project.LoadRenderPreset = lambda name: False
+
+        result = _prepare_render_job(
+            project,
+            {
+                "target_dir": tempfile.gettempdir(),
+                "from_preset": "H.264 Master",
+                "settings": {"ExportVideo": True},
+            },
+        )
+
+        self.assertFalse(result.get("success"))
+        self.assertEqual(result["error"]["code"], "RENDER_PRESET_LOAD_FAILED")
+        self.assertEqual(project.jobs, {})
 
     def test_prepare_render_job_normalizes_display_format_name(self):
         project = RenderProjectStub()
@@ -381,7 +499,23 @@ class DeliveryTargetTest(unittest.TestCase):
 
         self.assertIsNone(err)
         self.assertIsNone(resolved["qc_spec"])
-        self.assertIn("single file", resolved["qc_note"])
+        # The note must be the TARGET's own reason, not a hard-coded message —
+        # that hard-coding told WebP users their file was an image sequence.
+        self.assertEqual(resolved["qc_note"], DELIVERY_TARGETS["dpx_sequence"].qc_skip_reason)
+        self.assertIn("image sequence", resolved["qc_note"])
+
+    def test_qc_note_reports_each_target_s_own_reason(self):
+        """A target that declines QC for a non-sequence reason must say so."""
+        project = DeliveryTargetProjectStub()
+        project.GetRenderFormats = lambda: {"WebP": "webp"}
+        project.GetRenderCodecs = lambda fmt: {"Animated WebP": "Animated_WEBP"}
+
+        resolved, err = _resolve_delivery_target_live(project, {"target": "webp_animated"})
+
+        self.assertIsNone(err)
+        self.assertIsNone(resolved["qc_spec"])
+        self.assertIn("unverified", resolved["qc_note"])
+        self.assertNotIn("image sequence", resolved["qc_note"])
 
     def test_list_targets_reports_availability_against_the_live_matrix(self):
         result = _list_delivery_targets(DeliveryTargetProjectStub(), {"check_availability": True})

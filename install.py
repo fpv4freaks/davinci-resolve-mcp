@@ -3,7 +3,7 @@
 DaVinci Resolve MCP Server — Universal Installer
 
 Supports: macOS, Windows, Linux
-Configures: Claude Desktop, Claude Code, Cursor, VS Code (Copilot),
+Configures: Claude Desktop, Claude Code, Codex CLI, Cursor, VS Code (Copilot),
             Windsurf, Cline, Roo Code, Zed, Continue, OpenCode, and manual setup.
 
 Usage:
@@ -18,6 +18,7 @@ import json
 import math
 import os
 import platform
+import re
 import shutil
 import subprocess
 import sys
@@ -36,7 +37,7 @@ from src.utils.update_check import (
 
 # ─── Version ──────────────────────────────────────────────────────────────────
 
-VERSION = "2.70.3"
+VERSION = "2.103.1"
 # Only hard floor: mcp[cli] requires Python 3.10+. There is no upper bound —
 # Resolve's scripting bridge loads into newer interpreters on recent builds
 # (Python 3.14 verified against Resolve Studio 20.3.2). Older Resolve builds
@@ -44,6 +45,42 @@ VERSION = "2.70.3"
 # so we proceed with a heads-up rather than refusing to run.
 SUPPORTED_PYTHON_MIN = (3, 10)
 PYTHON_ABI_RISK_MIN = (3, 13)
+
+# ─── Console encoding ─────────────────────────────────────────────────────────
+# This installer prints box-drawing and check-mark glyphs. On Windows a console
+# stdout carries them fine, but a *redirected* stdout falls back to the locale
+# code page — cp1252 on a default Windows install — and the first '─' raises
+# UnicodeEncodeError. It fires at the summary, after every client is already
+# configured, so a successful install ends in a traceback and reads as a failed
+# run. Reported in #150 against
+# `npx davinci-resolve-mcp setup --clients manual 2>&1 | tail`.
+#
+# Only streams that cannot already carry the glyphs are touched, so a correctly
+# configured console keeps its own encoding. 'replace' is belt-and-braces: no
+# output path is worth a traceback.
+
+_GLYPH_PROBE = "─→✓⊘•"
+
+def _ensure_glyph_capable_stdio():
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        encoding = getattr(stream, "encoding", None)
+        if reconfigure is None or not encoding:
+            continue
+        try:
+            _GLYPH_PROBE.encode(encoding)
+            continue
+        except (LookupError, UnicodeEncodeError):
+            pass
+        try:
+            reconfigure(encoding="utf-8", errors="replace")
+        except Exception:
+            try:
+                reconfigure(errors="replace")
+            except Exception:
+                pass
+
+_ensure_glyph_capable_stdio()
 
 # ─── Colors (disabled on Windows cmd without ANSI support) ────────────────────
 
@@ -247,6 +284,24 @@ def find_resolve_paths():
             lib_path = expanded
             break
 
+    if lib_path is None:
+        # The literal candidates above only cover a default install. An explicit
+        # override wins outright; failing that, ask where Resolve actually is.
+        # Skipping this is what wrote an empty RESOLVE_SCRIPT_LIB into working
+        # configs and left the server importing a DLL that was never there.
+        env_lib = os.environ.get("RESOLVE_SCRIPT_LIB")
+        if env_lib and os.path.isfile(env_lib):
+            lib_path = env_lib
+        else:
+            # Narrow except: an ImportError here means the helper is absent,
+            # which is a real answer. Anything else raised *inside* discovery is
+            # a defect and must not be laundered into "no library found".
+            try:
+                from src.utils.platform import discover_scripting_lib
+            except ImportError:
+                discover_scripting_lib = None
+            lib_path = discover_scripting_lib() if discover_scripting_lib else None
+
     return api_path, lib_path
 
 
@@ -317,6 +372,16 @@ def windows_claude_desktop_config():
 def xdg_config():
     """Linux XDG_CONFIG_HOME or default."""
     return Path(os.environ.get("XDG_CONFIG_HOME", home() / ".config"))
+
+def codex_config():
+    """OpenAI Codex CLI config path (issue #39).
+
+    Codex keeps everything under ``$CODEX_HOME`` (default ``~/.codex``) and its
+    config is TOML, not JSON -- which is why the JSON-only installer skipped it
+    and users found no ``davinci-resolve`` entry after a successful install.
+    ``scripts/doctor.py`` already probes this exact path.
+    """
+    return Path(os.environ.get("CODEX_HOME", home() / ".codex")).expanduser() / "config.toml"
 
 def vscode_global_storage():
     """VS Code global storage path per platform."""
@@ -434,6 +499,16 @@ MCP_CLIENTS = [
         "config_key": "mcp",
         "notes": "AI coding agent (uses its own type/enabled/command-array format)",
     },
+    {
+        "id": "codex",
+        "name": "Codex CLI",
+        # Codex reads $CODEX_HOME/config.toml (default ~/.codex/config.toml) and
+        # keys MCP servers under [mcp_servers.<name>]. TOML, not JSON (issue #39).
+        "get_path": codex_config,
+        "config_key": "mcp_servers",
+        "format": "toml",
+        "notes": "OpenAI's CLI agent (TOML config)",
+    },
 ]
 
 CLIENT_IDS = [c["id"] for c in MCP_CLIENTS]
@@ -463,7 +538,14 @@ def get_python_base_install(python_path):
 
 
 def build_server_env(python_path, api_path, lib_path, system=SYSTEM, python_home=None):
-    """Build the env block used by all generated stdio MCP configs."""
+    """Build the env block used by all generated stdio MCP configs.
+
+    Keys whose value is empty are omitted rather than written as "". An empty
+    `RESOLVE_SCRIPT_LIB` is worse than an absent one: it reads as configured in
+    the config file, while `DaVinciResolveScript.py` treats it as unset and
+    silently reverts to its own hardcoded install path — so a machine with
+    Resolve elsewhere fails with a DLL-load error that names nothing useful.
+    """
     api_value = str(api_path or "")
     lib_value = str(lib_path or "")
     env = {
@@ -471,6 +553,7 @@ def build_server_env(python_path, api_path, lib_path, system=SYSTEM, python_home
         "RESOLVE_SCRIPT_LIB": lib_value,
         "PYTHONPATH": str(Path(api_value) / "Modules") if api_value else "",
     }
+    env = {key: value for key, value in env.items() if value}
 
     if system == "Windows":
         env["PYTHONHOME"] = str(python_home or get_python_base_install(python_path))
@@ -523,6 +606,126 @@ def build_opencode_entry(python_path, server_path, api_path, lib_path, system=SY
     }
 
 
+def _toml_basic_string(value):
+    """Quote a value as a TOML basic string, escaping what TOML requires.
+
+    Windows paths carry backslashes, which are escape characters inside a TOML
+    basic string -- an unescaped ``C:\\Users\\...`` would either change meaning or
+    make the whole config unparseable, taking every other MCP server down with it.
+    """
+    out = []
+    for ch in str(value):
+        if ch == "\\":
+            out.append("\\\\")
+        elif ch == '"':
+            out.append('\\"')
+        elif ch == "\n":
+            out.append("\\n")
+        elif ch == "\r":
+            out.append("\\r")
+        elif ch == "\t":
+            out.append("\\t")
+        elif ord(ch) < 0x20 or ord(ch) == 0x7F:
+            out.append("\\u%04X" % ord(ch))
+        else:
+            out.append(ch)
+    return '"' + "".join(out) + '"'
+
+
+CODEX_TABLE_HEADER = "[mcp_servers.davinci-resolve]"
+
+# A line that opens a new TOML table/array-of-tables: `[foo]`, `[foo.bar]`,
+# `[[foo]]`, optionally quoted, optionally trailed by a comment. Deliberately
+# stricter than "starts with [" so a line inside a multi-line array value is not
+# mistaken for the end of our table.
+_TOML_TABLE_LINE = re.compile(r"""^\s*\[\[?\s*[A-Za-z0-9_."'\- ]+\s*\]\]?\s*(#.*)?$""")
+
+# `[mcp_servers.davinci-resolve]` in any of TOML's equivalent spellings.
+_CODEX_TABLE_LINE = re.compile(
+    r"""^\s*\[\s*(?:mcp_servers|"mcp_servers"|'mcp_servers')\s*\.\s*"""
+    r"""(?:davinci-resolve|"davinci-resolve"|'davinci-resolve')\s*\]\s*(#.*)?$"""
+)
+
+# Inline spellings we can read but must not try to rewrite line-by-line:
+#   mcp_servers.davinci-resolve = { ... }        (dotted key at top level)
+#   davinci-resolve = { ... }                    (key inside [mcp_servers])
+#   mcp_servers = { "davinci-resolve" = ... }    (inline table at top level)
+_CODEX_DOTTED_KEY = re.compile(
+    r"""^\s*(?:mcp_servers|"mcp_servers"|'mcp_servers')\s*\.\s*"""
+    r"""(?:davinci-resolve|"davinci-resolve"|'davinci-resolve')\s*="""
+)
+_CODEX_BARE_KEY = re.compile(r"""^\s*(?:davinci-resolve|"davinci-resolve"|'davinci-resolve')\s*=""")
+_MCP_SERVERS_INLINE = re.compile(r"""^\s*(?:mcp_servers|"mcp_servers"|'mcp_servers')\s*=""")
+_MCP_SERVERS_TABLE = re.compile(
+    r"""^\s*\[\s*(?:mcp_servers|"mcp_servers"|'mcp_servers')\s*\]\s*(#.*)?$"""
+)
+
+# A sub-table of ours: `[mcp_servers.davinci-resolve.env]`,
+# `[mcp_servers.davinci-resolve.tools.timeline]`, and so on. Hand-written Codex
+# configs use these for per-tool approval modes, so they must survive a rewrite.
+_CODEX_CHILD_TABLE = re.compile(
+    r"""^\s*\[\[?\s*(?:mcp_servers|"mcp_servers"|'mcp_servers')\s*\.\s*"""
+    r"""(?:davinci-resolve|"davinci-resolve"|'davinci-resolve')\s*\.\s*"""
+    r"""[A-Za-z0-9_."'\- ]+\s*\]\]?\s*(#.*)?$"""
+)
+_CODEX_ENV_TABLE = re.compile(
+    r"""^\s*\[\s*(?:mcp_servers|"mcp_servers"|'mcp_servers')\s*\.\s*"""
+    r"""(?:davinci-resolve|"davinci-resolve"|'davinci-resolve')\s*\.\s*"""
+    r"""(?:env|"env"|'env')\s*\]\s*(#.*)?$"""
+)
+
+
+def build_codex_entry(python_path, server_path, api_path, lib_path, system=SYSTEM, python_home=None):
+    """Build the Codex server entry as data, before it is rendered to TOML."""
+    return {
+        "command": str(python_path),
+        "args": [str(server_path)],
+        "env": build_server_env(
+            python_path, api_path, lib_path, system=system, python_home=python_home
+        ),
+    }
+
+
+def render_codex_table(entry, env_as_subtable=False):
+    """Render a Codex entry as a ``[mcp_servers.davinci-resolve]`` table.
+
+    ``env`` goes in an inline table by default -- the shape ``codex mcp add``
+    writes. When the config being edited already spells env out as an
+    ``[mcp_servers.davinci-resolve.env]`` sub-table, pass ``env_as_subtable`` so
+    the rewrite keeps that shape: TOML forbids defining ``env`` both ways, and a
+    file with both is rejected in full.
+    """
+    args = ", ".join(_toml_basic_string(arg) for arg in entry["args"])
+    lines = [
+        CODEX_TABLE_HEADER,
+        f"command = {_toml_basic_string(entry['command'])}",
+        f"args = [{args}]",
+    ]
+    env = entry.get("env") or {}
+    if env and not env_as_subtable:
+        inner = ", ".join(f"{key} = {_toml_basic_string(value)}" for key, value in env.items())
+        lines.append("env = { " + inner + " }")
+    return "\n".join(lines) + "\n"
+
+
+def render_codex_env_table(env):
+    """Render the ``[mcp_servers.davinci-resolve.env]`` sub-table form."""
+    lines = [CODEX_TABLE_HEADER[:-1] + ".env]"]
+    lines += [f"{key} = {_toml_basic_string(value)}" for key, value in env.items()]
+    return "\n".join(lines) + "\n"
+
+
+def build_codex_block(python_path, server_path, api_path, lib_path, system=SYSTEM, python_home=None):
+    """Render the Codex CLI ``[mcp_servers.davinci-resolve]`` table (issue #39).
+
+    Codex's config is TOML, so this returns text rather than a dict.
+    """
+    entry = build_codex_entry(
+        python_path, server_path, api_path, lib_path, system=system, python_home=python_home
+    )
+    return render_codex_table(entry)
+
+
 def build_entry_for_client(client, python_path, server_path, api_path, lib_path, system=SYSTEM, python_home=None):
     """Return the server entry shaped for a specific client's config schema."""
     builders = {
@@ -540,6 +743,233 @@ class ConfigParseError(Exception):
     Callers must NOT overwrite such a file -- doing so destroys the user's
     settings (issue #71).
     """
+
+
+_CODEX_MANAGED_KEY = re.compile(
+    r"""^\s*(?:command|"command"|'command'|args|"args"|'args'|env|"env"|'env')\s*="""
+)
+
+
+def _toml_open_delimiters(line):
+    """Net count of unclosed ``[``/``{`` on a line, ignoring quoted text."""
+    depth = 0
+    quote = None
+    escape = False
+    for ch in line:
+        if quote:
+            if escape:
+                escape = False
+            elif ch == "\\" and quote == '"':
+                escape = True
+            elif ch == quote:
+                quote = None
+            continue
+        if ch in "\"'":
+            quote = ch
+        elif ch in "[{":
+            depth += 1
+        elif ch in "]}":
+            depth -= 1
+        elif ch == "#":
+            break
+    return depth
+
+
+def _drop_managed_codex_keys(direct_lines):
+    """Return the table's own lines minus the command/args/env we regenerate.
+
+    Anything else in the table is the user's -- Codex's per-server knobs
+    (``startup_timeout_sec``, ``tool_timeout_sec``), comments, blank lines -- and
+    an installer has no business dropping it during an update.
+    """
+    kept = []
+    i = 0
+    while i < len(direct_lines):
+        line = direct_lines[i]
+        if not _CODEX_MANAGED_KEY.match(line):
+            kept.append(line)
+            i += 1
+            continue
+        # Skip the assignment, including a value spread over several lines.
+        depth = _toml_open_delimiters(line)
+        i += 1
+        while i < len(direct_lines) and depth > 0:
+            depth += _toml_open_delimiters(direct_lines[i])
+            i += 1
+    return kept
+
+
+def merge_codex_toml(existing_text, entry):
+    """Splice a Codex server ``entry`` into an existing config, preserving the rest.
+
+    This is a text-level merge on purpose: Python has no TOML writer in the
+    standard library, and a parse-and-rewrite would silently strip the user's
+    comments and formatting. An existing ``[mcp_servers.davinci-resolve]`` table
+    has its ``command``/``args``/``env`` replaced in place; otherwise the table is
+    appended.
+
+    Sub-tables of that entry survive untouched -- hand-written Codex configs put
+    per-tool approval modes in ``[mcp_servers.davinci-resolve.tools.<tool>]``, and
+    an installer that dropped them would quietly widen what the agent may do
+    without asking. An ``[mcp_servers.davinci-resolve.env]`` sub-table is
+    regenerated in place rather than replaced with an inline ``env``, since TOML
+    rejects a file that spells the same key both ways.
+
+    Raises :class:`ConfigParseError` when the server is defined in an inline form
+    this splice cannot safely rewrite -- appending anyway would produce a
+    duplicate key and make Codex reject the entire file.
+    """
+    lines = existing_text.splitlines()
+
+    in_mcp_servers_table = False
+    for line in lines:
+        if _CODEX_DOTTED_KEY.match(line):
+            raise ConfigParseError(
+                "davinci-resolve is already defined as a dotted key (mcp_servers.davinci-resolve)"
+            )
+        if _MCP_SERVERS_INLINE.match(line):
+            # TOML forbids extending an inline table, so no table header we
+            # append could attach to this mcp_servers definition.
+            raise ConfigParseError(
+                "mcp_servers is defined as an inline table, which cannot be extended"
+            )
+        if _MCP_SERVERS_TABLE.match(line):
+            in_mcp_servers_table = True
+            continue
+        if _TOML_TABLE_LINE.match(line):
+            in_mcp_servers_table = False
+            continue
+        if in_mcp_servers_table and _CODEX_BARE_KEY.match(line):
+            raise ConfigParseError(
+                "davinci-resolve is already defined as an inline key under [mcp_servers]"
+            )
+
+    start = next((i for i, line in enumerate(lines) if _CODEX_TABLE_LINE.match(line)), None)
+
+    if start is None:
+        prefix = existing_text
+        if prefix and not prefix.endswith("\n"):
+            prefix += "\n"
+        if prefix.strip():
+            prefix += "\n"
+        return prefix + render_codex_table(entry)
+
+    # Our region runs to the next table that is NOT one of our sub-tables.
+    end = len(lines)
+    for i in range(start + 1, len(lines)):
+        if _TOML_TABLE_LINE.match(lines[i]) and not _CODEX_CHILD_TABLE.match(lines[i]):
+            end = i
+            break
+
+    region = lines[start + 1:end]
+    first_child = next(
+        (i for i, line in enumerate(region) if _CODEX_CHILD_TABLE.match(line)), None
+    )
+    direct = region if first_child is None else region[:first_child]
+    children = [] if first_child is None else region[first_child:]
+
+    env_child = next((i for i, line in enumerate(children) if _CODEX_ENV_TABLE.match(line)), None)
+
+    rebuilt = render_codex_table(entry, env_as_subtable=env_child is not None).rstrip("\n").split("\n")
+    # Everything in the table that is not command/args/env stays: Codex's own
+    # per-server knobs (startup_timeout_sec, tool_timeout_sec, ...) plus the
+    # user's comments and blank lines.
+    rebuilt += _drop_managed_codex_keys(direct)
+
+    if env_child is not None:
+        env_end = len(children)
+        for i in range(env_child + 1, len(children)):
+            if _CODEX_CHILD_TABLE.match(children[i]):
+                env_end = i
+                break
+        env_tail = []
+        for line in reversed(children[env_child + 1:env_end]):
+            if line.strip():
+                break
+            env_tail.append("")
+        children = (
+            children[:env_child]
+            + render_codex_env_table(entry.get("env") or {}).rstrip("\n").split("\n")
+            + env_tail
+            + children[env_end:]
+        )
+
+    merged = lines[:start] + rebuilt + children + lines[end:]
+    return "\n".join(merged) + "\n"
+
+
+def write_codex_config(config_path, entry, dry_run=False):
+    """Write/merge the Codex TOML config. Returns (success, message)."""
+    config_path = Path(config_path)
+
+    try:
+        existing_text = config_path.read_text(encoding="utf-8")
+    except FileNotFoundError:
+        existing_text = ""
+    except (OSError, UnicodeDecodeError) as exc:
+        return False, (
+            f"{config_path} could not be read ({exc}). Refusing to overwrite it — "
+            f"add the entry manually (run with --manual)."
+        )
+
+    # If this interpreter can parse TOML, refuse to touch a file that is already
+    # broken: same policy as the JSON clients (issue #71) — never rewrite a config
+    # we cannot understand.
+    parse_toml = getattr(_toml_loader(), "loads", None)
+    if parse_toml and existing_text.strip():
+        try:
+            parse_toml(existing_text)
+        except Exception as exc:
+            return False, (
+                f"{config_path} exists but is not valid TOML ({exc}). Refusing to "
+                f"overwrite to avoid data loss. Add the "
+                f'"{CODEX_TABLE_HEADER}" entry manually (run with --manual).'
+            )
+
+    try:
+        merged = merge_codex_toml(existing_text, entry)
+    except ConfigParseError as exc:
+        return False, (
+            f"{config_path}: {exc}. Refusing to edit it — update that entry "
+            f"manually (run with --manual)."
+        )
+
+    if parse_toml:
+        try:
+            parse_toml(merged)
+        except Exception as exc:  # pragma: no cover - guard against a bad splice
+            return False, (
+                f"Merged Codex config would not parse ({exc}); left {config_path} "
+                f"untouched. Add the entry manually (run with --manual)."
+            )
+
+    if dry_run:
+        return True, f"Would write to {config_path}:\n{render_codex_table(entry)}"
+
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+    if config_path.exists():
+        shutil.copy2(config_path, config_path.with_suffix(config_path.suffix + ".backup"))
+    config_path.write_text(merged, encoding="utf-8")
+    return True, str(config_path)
+
+
+def _toml_loader():
+    """Return a TOML reader module, or None on interpreters without one.
+
+    ``tomllib`` is stdlib from Python 3.11; the project floor is 3.10, so the
+    validation it enables is a bonus, not a requirement.
+    """
+    try:
+        import tomllib
+
+        return tomllib
+    except ImportError:
+        try:
+            import tomli
+
+            return tomli
+        except ImportError:
+            return None
 
 
 def _strip_jsonc(text):
@@ -676,6 +1106,12 @@ def write_client_config(client, python_path, server_path, api_path, lib_path, dr
 
     config_key = client["config_key"]
 
+    # Codex keeps its config in TOML, so it takes a text splice rather than a
+    # JSON merge (issue #39).
+    if client.get("format") == "toml":
+        entry = build_codex_entry(python_path, server_path, api_path, lib_path)
+        return write_codex_config(config_path, entry, dry_run=dry_run)
+
     # Build the server entry (some clients use a non-standard schema)
     server_entry = build_entry_for_client(client, python_path, server_path, api_path, lib_path)
 
@@ -746,8 +1182,9 @@ def generate_manual_config(python_path, server_path, api_path, lib_path):
     }}, indent=2)
     zed_fmt = json.dumps({"context_servers": {"davinci-resolve": zed_entry}}, indent=2)
     opencode_fmt = json.dumps({"mcp": {"davinci-resolve": opencode_entry}}, indent=2)
+    codex_fmt = build_codex_block(python_path, server_path, api_path, lib_path).rstrip("\n")
 
-    return standard, vscode_fmt, zed_fmt, opencode_fmt
+    return standard, vscode_fmt, zed_fmt, opencode_fmt, codex_fmt
 
 # ─── Virtual Environment ─────────────────────────────────────────────────────
 
@@ -1510,7 +1947,13 @@ def main():
     if lib_path:
         print(f"  Library:   {green(lib_path)}")
     else:
-        print(f"  Library:   {yellow('Not found')} {dim('(optional — API path is sufficient)')}")
+        # Not optional, whatever this line used to claim: DaVinciResolveScript
+        # is a thin wrapper that loads this binary, so without it every tool
+        # fails at import. Saying "API path is sufficient" here sent people
+        # looking at their Resolve edition and their preferences instead.
+        print(f"  Library:   {red('Not found')} {dim('(required — the scripting API cannot load without it)')}")
+        print(f"  {dim('Set RESOLVE_SCRIPT_LIB to the fusionscript library inside your Resolve install,')}")
+        print(f"  {dim('or start Resolve and re-run setup so its location can be read from the process.')}")
 
     resolve_running = check_resolve_running()
     if resolve_running:
@@ -1668,7 +2111,7 @@ def main():
 
     # Show manual config
     if show_manual:
-        standard, vscode_fmt, zed_fmt, opencode_fmt = generate_manual_config(
+        standard, vscode_fmt, zed_fmt, opencode_fmt, codex_fmt = generate_manual_config(
             python_path, server_path, api_path, lib_path
         )
         env_preview = build_server_env(python_path, api_path, lib_path)
@@ -1690,6 +2133,10 @@ def main():
         print()
         for line in opencode_fmt.split("\n"):
             print(f"    {line}")
+        print(f"\n  {cyan('Codex CLI format')} (TOML — add to ~/.codex/config.toml):")
+        print()
+        for line in codex_fmt.split("\n"):
+            print(f"    {line}")
         print(f"\n  {cyan('JetBrains IDEs')} (IntelliJ, WebStorm, PyCharm, etc.):")
         print(f"    Settings → Tools → AI Assistant → Model Context Protocol (MCP)")
         print(f"    Add server with command: {python_path} {server_path}")
@@ -1707,6 +2154,7 @@ def main():
     if interactive:
         print_step(5, total_steps, "Verification")
 
+    verification_failed = False
     if api_path:
         success, message = verify_resolve_connection(python_path, api_path, lib_path)
         try:
@@ -1748,21 +2196,36 @@ def main():
                         "               python scripts/install_resolve_bridge.py"
                     )
                     print(
-                        "               then Workspace > Scripts > resolve_bridge, "
-                        "and set DAVINCI_RESOLVE_BRIDGE=1"
+                        "               then Workspace > Scripts > resolve_bridge "
+                        "(used automatically once running)"
                     )
                 else:
                     print(f"  Resolve:   {yellow('Not running')} — start Resolve to use MCP tools")
             else:
                 print(f"  Connected: {green(message)}")
         else:
-            print(f"  Verify:    {yellow(message)}")
+            verification_failed = True
+            print(f"  Verify:    {red(message)}")
+            if "DLL load failed" in message or "cannot open shared object" in message:
+                # This is the shape of a wrong or missing library path, and it
+                # is the one failure the installer can diagnose precisely. Say
+                # so before offering the interpreter theory below — a reader who
+                # is told "try another Python" first will go and do that.
+                print(
+                    f"             The scripting library named by RESOLVE_SCRIPT_LIB did not load. "
+                    f"Current value: {lib_path or dim('(not set)')}"
+                )
+                print(
+                    "             Point RESOLVE_SCRIPT_LIB at the fusionscript library inside your "
+                    "Resolve install, or start Resolve and re-run setup."
+                )
             if py_abi_risk:
                 print(
                     f"             On Python 3.13+ this may be an ABI mismatch with Resolve's "
                     f"scripting library — try Python 3.10-3.12 if it persists."
                 )
     else:
+        verification_failed = True
         print(f"  {yellow('Skipped')} — Resolve API path not detected")
 
     # ══════════════════════════════════════════════════════════════════════
@@ -1770,7 +2233,25 @@ def main():
     # ══════════════════════════════════════════════════════════════════════
 
     print(f"\n  {'═' * 50}")
-    if configured or show_manual:
+    if verification_failed and (configured or show_manual):
+        # Writing the configs is not the job; a working connection is. Reporting
+        # "Setup complete!" over a failed verification is how an install that
+        # never worked gets handed to the user as finished — the error scrolls
+        # past mid-output and the last line says success.
+        print(f"  {yellow(bold('Setup incomplete — the scripting API did not load.'))}")
+        if configured:
+            print(f"  Configured: {', '.join(configured)} {dim('(written, but the server will fail to start)')}")
+        print()
+        print(f"  {bold('Fix the verification error above, then re-run:')}")
+        print(f"    {cyan('python install.py')}")
+        print()
+        print(f"  {dim(f'Server: {server_path}')}")
+        print(f"  {dim(f'Python: {python_path}')}")
+        if api_path:
+            print(f"  {dim(f'API:    {api_path}')}")
+        if lib_path:
+            print(f"  {dim(f'Library: {lib_path}')}")
+    elif configured or show_manual:
         print(f"  {green(bold('Setup complete!'))}")
         if configured:
             print(f"  Configured: {', '.join(configured)}")
@@ -1789,18 +2270,32 @@ def main():
         if api_path:
             print(f"  {dim(f'API:    {api_path}')}")
     elif not selected_ids:
-        print(f"  {green(bold('Environment ready!'))}")
-        print(f"  Run {cyan('python install.py --clients all')} to configure MCP clients later.")
+        # Same rule as the configured branch above: a failed verification is
+        # never "ready". Nothing was written here, so the remedy is the error
+        # itself rather than a re-run to fix a config.
+        if verification_failed:
+            print(f"  {yellow(bold('Environment incomplete — the scripting API did not load.'))}")
+            print(f"  {dim('No client configs were written.')}")
+            print()
+            print(f"  {bold('Fix the verification error above, then re-run:')}")
+            print(f"    {cyan('python install.py')}")
+        else:
+            print(f"  {green(bold('Environment ready!'))}")
+            print(f"  Run {cyan('python install.py --clients all')} to configure MCP clients later.")
     else:
         print(f"  {yellow('No clients configured.')}")
         print(f"  Run {cyan('python install.py')} again to retry.")
 
     print()
+    # Exit status has to agree with the summary line above. `npx
+    # davinci-resolve-mcp setup` is run from scripts and CI, where a zero over a
+    # dead install is the same lie as "Setup complete!" was.
+    return 1 if verification_failed else 0
 
 
 if __name__ == "__main__":
     try:
-        main()
+        sys.exit(main() or 0)
     except KeyboardInterrupt:
         print(f"\n\n  {dim('Interrupted.')}\n")
         sys.exit(1)
